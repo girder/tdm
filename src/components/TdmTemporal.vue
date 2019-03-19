@@ -259,7 +259,7 @@ export default {
         y: 0,
         dy: '.35em',
         text: String(this.threshold),
-        stroke: '#555',
+        stroke: '#FFF',
       };
     },
   },
