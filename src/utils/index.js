@@ -42,7 +42,7 @@ function valBetween(v, min, max) {
  * Get the URL parameters
  * source: https://css-tricks.com/snippets/javascript/get-url-variables/
  * @param  {String} url The URL
- * @return {Object}     The URL parameters
+ * @returns {Object}    The URL parameters
  */
 function getParams(url) {
   const params = {};
@@ -57,9 +57,53 @@ function getParams(url) {
   return params;
 }
 
+/**
+ * Function to backfill a track with detections at each frame and a constant confidence value
+ * @param {Array<import('./tdm').Detection>} detections
+ * @param {Number} begin
+ * @param {Number} end
+ * @param {Number} confidence
+ * @returns {Array<import('./tdm').Detection>}
+ */
+function fillMissingDetections(detections, begin, end, confidence = 0.01) {
+  let next = 0;
+  const output = [];
+  for (let frame = begin; frame <= end; frame += 1) {
+    if (frame === detections[next].frame) {
+      output.push(detections[next]);
+      next = next < (detections.length - 1) ? next + 1 : next;
+    } else {
+      output.push({
+        frame,
+        meta: { confidence },
+        track: detections[next].track,
+      });
+    }
+  }
+  return output;
+}
+
+/**
+ * Convert x and y from system1 to system2
+ * @param {Number} x
+ * @param {Number} y
+ * @param {Arary<Number>} system1
+ * @param {Array<Number>} system2
+ */
+function convert2d(x, y, system1, system2) {
+  const [s1width, s1height] = system1;
+  const [s2width, s2height] = system2;
+  return [
+    (x / s1width) * s2width,
+    (y / s1height) * s2height,
+  ];
+}
+
 export {
+  convert2d,
   debounce,
   getParams,
   tdm,
   valBetween,
+  fillMissingDetections,
 };

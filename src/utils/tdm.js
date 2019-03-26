@@ -45,35 +45,48 @@ export const STATES = {
  * @enum {ShapeType}
  */
 export const SHAPES = {
-  POINT: 1,
-  LINE: 2,
+  POINT: 1, // data: point, radius, width
+  LINE: 2, // data: a: [x, y], b: [x, y], width
+  BOX: 3, // data: box: Detection.box, width
+  REGION: 4, // data: box: Detection.box, opacity
+  IMAGE: 5, // data: url, x, y
+  LABEL: 6, // data: text, bgcolor, textcolor
 };
 
 /**
- * Meta Schema
+ * Meta Schema; can have any properties.
  * @typedef {Obect} Metadata
- * ... Can have any properties.
  */
 
 /**
- * Shape Schema
+ * Shape Schema; shapes describe a drawable annotation
  * @typedef {Object} Shape
- * @property {any} data
+ * @property {Object} data
  * @property {ShapeType} type
+ * @property {String} color
+ * @property {Object} meta
  */
 
 /**
- * Detection Schema
+ * Event Schema; an event is a range within a track
+ * @typedef {Object} Event
+ * @param {Track} track reference to the parent track
+ * @param {Number} begin integer frame #
+ * @param {Number} end integer frame #
+ */
+
+/**
+ * Detection Schema; a detection describes a single frame within a track
  * @typedef {Object} Detection
  * @property {Number} frame
  * @property {Array<Number>} box [x_left, y_top, x_right, y_bottom]
- *                               null box means this detection applies to entire frame.
- * @property {Track} track backreference to track that owns it.
- * @property {Metadata} meta metadata for this single detection.
+ *                               null box means this detection applies to entire frame
+ * @property {String} image a url for an image to overlay within box
+ * @property {Metadata} meta metadata for this single detection
  */
 
 /**
- * Track Schema
+ * Track Schema; a track is an annotated range within a single video
  * @typedef {Object} Track
  * @property {String} key a unique key to identify the track
  * @property {Metadata} meta
@@ -81,13 +94,45 @@ export const SHAPES = {
  * @property {Number} begin
  * @property {Number} end
  * @property {Boolean} interpolated whether the detections need interpolation
- * @property {String} color html color string
- * @property {Array<Shapes>} shapes
- * @property {TrackState} state
  */
 
+/* Private functions */
+
 /**
- * Returns the linear interpolation between d0 and d1 at currentFrame.
+ * @param {Track} track
+ * @param {Number} threshold
+ * @param {String} thresholdKey
+ * @returns {Array<Event>}
+ */
+function _findThresholdCrossings(track, threshold, thresholdKey) {
+  const crossings = [];
+  let pair = null;
+  let looking = false; // true = looking for close.  false = looking for open.
+  for (let i = 0; i < track.detections.length; i += 1) {
+    const d = track.detections[i];
+    const val = d.meta[thresholdKey];
+    if ((val > threshold || !threshold) && !looking) {
+      looking = true;
+      pair = [d.frame];
+    } else if (
+      ((val < threshold) || (i === (track.detections.length - 1))) && looking) {
+      looking = false;
+      pair.push(d.frame);
+      crossings.push({
+        meta: track.meta,
+        track,
+        begin: pair[0],
+        end: pair[1],
+      });
+    }
+  }
+  return crossings;
+}
+
+/* public functions */
+
+/**
+ * Returns the linear interpolation between d0 and d1 at currentFrame
  * @param {Number} currentFrame
  * @param {Detection} d0
  * @param {Detection} d1
@@ -98,7 +143,10 @@ function interpolateFrames(currentFrame, d0, d1) {
   // a + b = 1; interpolate from a to b
   const b = Math.abs((currentFrame - d0.frame) / len);
   const a = 1 - b;
-  const box = d0.box.map((_, i) => ((d0.box[i] * a) + (d1.box[i] * b)));
+  let box;
+  if (d0.box) {
+    box = d0.box.map((_, i) => ((d0.box[i] * a) + (d1.box[i] * b)));
+  }
   const frame = Math.round((d0.frame * a) + (d1.frame * b));
   return { ...d0, frame, box };
 }
@@ -109,7 +157,7 @@ function interpolateFrames(currentFrame, d0, d1) {
  * @returns {Array<Number>}
  */
 function scaleBox(box, scale) {
-  return box.map(n => (n * scale));
+  return box.map(n => Math.round(n * scale));
 }
 
 /**
@@ -140,67 +188,107 @@ function centroid(box, x = 0.5, y = 0.5) {
  * @param {Array<Detection>} detections
  * @returns {Array<Shape>}
  */
-function generateCentroids(detections) {
+function generateCentroids(detections, color, radius = 6) {
   return detections.map(d => ({
     type: SHAPES.POINT,
+    color,
     data: {
+      width: 1,
       point: centroid(d.box),
-      radius: 4, // unitless scalar
+      radius, // unitless scalar
     },
   }));
-}
-
-function findThresholdCrossings(track, threshold, thresholdKey) {
-  const crossings = [];
-  let pair = null;
-  let looking = false; // true = looking for close.  false = looking for open.
-  for (let i = 0; i < track.detections.length; i += 1) {
-    const d = track.detections[i];
-    const val = d.meta[thresholdKey];
-    if (val > threshold && !looking) {
-      looking = true;
-      pair = [d.frame + 0.01];
-    } else if (val < threshold && looking) {
-      looking = false;
-      pair.push(d.frame);
-      crossings.push(pair);
-    } else if (looking && i === (track.detections.length - 1)) {
-      looking = false;
-      pair.push(d.frame);
-      crossings.push(pair);
-    }
-  }
-  return crossings;
-}
-
-function seriesForThreshold(tracks, threshold, thresholdKey) {
-  return tracks
-    .map(track => findThresholdCrossings(track, threshold, thresholdKey))
-    .filter(series => series.length > 0);
 }
 
 /**
- * Generate a list of lines between all centroids for a track.
- * @param {Array<Detection>} detections
- * @returns {Array<Shape>}
+ * Return a list of events for tracks with detections > threshold
+ * @param {Object<string, Array<Track>>} groups the groups to threshold
+ * @param {Number} threshold scalar comparator
+ * @param {String} thresholdKey detection metadata key to use as thresh value
+ * @returns {Array<Array<Event>>}
  */
-function generateDetectionLines(detections, x = 0.5, y = 0.5) {
-  return detections.slice(0, detections.length - 1).map((_, i) => ({
-    type: SHAPES.LINE,
-    data: {
-      width: 2,
-      a: centroid(detections[i].box, x, y),
-      b: centroid(detections[i + 1].box, x, y),
-    },
-  }));
+function eventsForThreshold(groups, threshold, thresholdKey) {
+  const groupKeys = Object.keys(groups);
+  const eventsMap = {};
+  groupKeys.forEach((groupByKey) => {
+    const tracks = groups[groupByKey];
+    const eventslist = tracks
+      .map(t => _findThresholdCrossings(t, threshold, thresholdKey))
+      .filter(events => events.length > 0);
+    eventsMap[groupByKey] = eventslist;
+  });
+  return eventsMap;
+}
+
+/**
+ * Determine if x, y are inside shape
+ */
+function intersect({ x, y }, shape) {
+  switch (shape.type) {
+    case SHAPES.POINT: {
+      const { point, radius } = shape.data;
+      if (point[0] - radius < x
+        && (x < point[0] + radius)
+        && point[1] - radius < y
+        && y < point[1] + radius) {
+        return true;
+      }
+      break;
+    }
+    default: {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {Array<Detection>} detections
+ * @param {Function<Detection>:String} colorfunc
+ * @returns {Array<Array<Shape>>} where outer array is keyed by frame #
+ */
+function generateDetectionLines(detections, colorfunc, width = 2, x = 0.5, y = 0.5) {
+  const lines = [];
+  let last = null;
+  detections.forEach((detection, frame) => {
+    if (last) {
+      lines[last.frame] = [{
+        type: SHAPES.LINE,
+        color: colorfunc(last),
+        data: {
+          width,
+          a: centroid(last.box, x, y),
+          b: centroid(detection.box, x, y),
+        },
+      }];
+    }
+    last = detection;
+  });
+  return lines;
+}
+
+/**
+ * Merge thinglists from b into a
+ */
+function mergeFrameArrays(a, b) {
+  b.forEach((thinglist, frame) => {
+    if (a[frame]) {
+      a[frame].push(...thinglist);
+    } else {
+      a[frame] = thinglist;
+    }
+  });
+  return a;
 }
 
 export {
   centroid,
+  eventsForThreshold,
   filterByMeta,
   generateCentroids,
   generateDetectionLines,
   interpolateFrames,
+  intersect,
+  mergeFrameArrays,
   scaleBox,
-  seriesForThreshold,
 };

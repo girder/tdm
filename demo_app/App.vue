@@ -1,18 +1,19 @@
 <template lang="pug">
-v-app.annotation-view(dark)
-  v-flex(row, shrink)
-    v-alert(:value="loading", type="warning") Loading...
-    v-alert(:value="err", type="error") {{ err }}
-  tdm-app(
-      :autoplay="false",
-      :loading="loading",
-      :label-format="labelFormat",
-      :meta="meta")
-    v-card(dark, slot="subvideowidget", tile)
-      tdm-temporal.mx-2(:threshold.sync="threshold")
-    v-card.my-2.pa-3(slot="widget")
-      h3.headline Upload your own KPF
-      diva-kpf-widget(@loaded="addTracks({ tracks: $event, key: colorBy})")
+v-app.annotation-view
+  v-content
+    v-flex(row, shrink)
+      v-alert(:value="err", type="error") {{ err }}
+    v-container(fluid)
+      tdm-app(
+          :autoplay="false",
+          :loading="loading",
+          :label-format="labelFormat",
+          :file-list-visible.sync="browserOpen",
+          :followers.sync="followers",
+          :meta="meta")
+        template(#filelist)
+          h3.headline Upload your own KPF
+          diva-kpf-widget(@loaded="addTracks({ tracks: $event, key: colorBy})")
 </template>
 
 <script>
@@ -21,8 +22,9 @@ import { mapState, mapMutations, mapActions } from 'vuex';
 
 import KPF from '@/utils/divakpf.js';
 import { generateDetectionLines } from '@/utils/tdm.js';
-import { DivaKpfWidget, SelectionWidget, TdmTemporal } from '@/components';
-import TdmApp from '@/layouts/TwoColumn';
+import { DivaKpfWidget, SelectionWidget, TdmTemporal, EventListWidget } from '@/components';
+import TdmApp from '@/layouts/OneColumn';
+import TimeBus from '@/utils/timebus.js';
 
 export default {
   components: {
@@ -30,15 +32,16 @@ export default {
     TdmTemporal,
     DivaKpfWidget,
     SelectionWidget,
+    EventListWidget,
   },
   data() {
     return {
       loading: false,
       initialColorBy: 'name',
       labelFormat: ['name', 'actor_id'],
-      autocomplete: null,
+      browserOpen: false,
+      followers: [],
       err: '',
-      threshold: 0.8,
       meta: {
         name: 'Activity Type',
         type: 'Actor Type',
@@ -59,11 +62,12 @@ export default {
       }
     };
   },
-  computed: mapState(['colorBy']),
+  computed: mapState(['colorBy', 'thresholdedEvents', 'framerate']),
   async mounted() {
     this.setUrl({ url: this.video.url });
     this.setWidth({ width: parseInt(this.video.width || 1920, 10) });
     this.setHeight({ height: parseInt(this.video.height || 1080, 10) });
+    this.setThreshold({ threshold: 0.8 });
     this.setFramerate({
       framerate: parseFloat(this.video.framerate || 30.0),
     });
@@ -96,11 +100,15 @@ export default {
       'setHeight',
       'setDuration',
       'setFramerate',
-      'setColorBy',
+      'setThreshold',
       'bucketSort',
       'colorByMeta',
     ]),
     ...mapActions(['addTracks', 'setTracks']),
+    scrubToEvent(event){
+      const fixed = event.begin / this.framerate;
+      TimeBus.$emit('master:active', fixed);
+    },
   },
 };
 </script>

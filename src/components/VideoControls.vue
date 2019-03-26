@@ -1,48 +1,7 @@
-<template lang="pug">
-v-toolbar.video-controls(shift, dense)
-  v-layout(row, align-center, wrap)
-    v-flex(shrink)
-      v-btn(icon, @click="skip(false)")
-        v-icon skip_previous
-      v-btn(icon, @click="setPlaying({ playing: !localPlaying })")
-        v-icon(v-show="localPlaying") pause
-        v-icon(v-show="!localPlaying") play_arrow
-      v-btn(icon, @click="skip(true)")
-        v-icon skip_next
-      //- span.px-1 {{ toTimeStamp(time) }} / {{ toTimeStamp(localOffset + localDuration) }}
-    v-flex.shrink
-      v-select.px-2(
-          @change="setPlaybackRate({ playbackRate: $event })",
-          :items="playbackRateOptions",
-          :value="localPlaybackRate",
-          solo)
-        template(slot="item", slot-scope="props")
-          p {{ `${props.item}x Speed` }}
-        template(slot="selection", slot-scope="props")
-          span {{ `${props.item}x Speed`}}
-    v-spacer
-    v-flex.shrink
-      v-switch.px-2.flat(
-          label="labels",
-          hide-details,
-          :input-value="localShowLabels",
-          @change="setShowLabels({ labels: $event })")
-    v-flex.shrink
-      v-switch.px-2.flat(
-          label="shapes",
-          hide-details,
-          :input-value="localShowShapes",
-          @change="setShowShapes({ shapes: $event })")
-    v-flex.shrink
-      v-select.px-2(
-          @change="updateColorBy",
-          :items="Object.keys(colorByOptions).map(c => colorByOptions[c])",
-          solo,
-          :value="colorByOptions[localColorBy]")
-</template>
-
 <script>
-import { mapState, mapMutations, mapActions } from 'vuex';
+import { createNamespacedHelpers } from 'vuex'
+const { mapState, mapActions, mapMutations } = createNamespacedHelpers('tdm')
+import TimeStamp from './TimeStamp';
 import TimeBus from '../utils/timebus';
 
 export default {
@@ -55,33 +14,32 @@ export default {
       type: Array,
       default: () => [0.0625, 0.2, 0.5, 1, 2, 5],
     },
-    withslider: {
+    withToggles: {
       type: Boolean,
       default: true,
     },
+    timebusName: {
+      type: String,
+      default: 'master',
+    },
   },
+  
+  components: { TimeStamp },
+  
   data() {
-    return {
-      scrubbing: false,
-      time: 0, // in seconds
+    return { scrubbing: false };
+  },
 
-      // Performance hacks,
-      localPlaybackRate: 1,
-      localColorBy: '',
-      localDuration: 0,
-      localOffset: 0,
-      localShowLabels: false,
-      localShowShapes: false,
-      localPlaying: false,
-    };
-  },
-  mounted() {
-    // read from the passive clock to keep the scrubber up to date.
-    TimeBus.$on('passive', time => (this.time = time));
-    this.$store.watch((store) => {
-      this.setFromStore(store);
-    });
-  },
+  computed: mapState([
+    'duration',
+    'offset',
+    'colorBy',
+    'playbackRate',
+    'labels',
+    'shapes',
+    'playing',
+  ]),
+
   methods: {
     ...mapMutations([
       'setPlaying',
@@ -89,41 +47,70 @@ export default {
       'setShowLabels',
       'setShowShapes',
     ]),
+
     ...mapActions([
       'groupByMeta',
     ]),
-    setFromStore(store) {
-      this.localPlaybackRate = store.playbackRate;
-      this.localColorBy = store.colorBy;
-      this.localDuration = store.duration;
-      this.localOffset = store.offset;
-      this.localShowLabels = store.labels;
-      this.localShowShapes = store.shapes;
-      this.localPlaying = store.playing;
-    },
-    pad(num) {
-      return num < 10 ? `0${num}` : num;
-    },
-    toTimeStamp(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = Math.floor(seconds % 60);
-      return `${this.pad(min)}:${this.pad(sec)}`;
-    },
+
     updateColorBy(event) {
       this.groupByMeta({
         key: Object.keys(this.colorByOptions).find(c => this.colorByOptions[c] === event),
       });
     },
+
     skip(direction) {
-      if (direction) {
-        TimeBus.$emit('active', this.time + 5);
-      } else {
-        TimeBus.$emit('active', this.time > 5 ? this.time - 5 : 0);
-      }
+      TimeBus.$emit(`${this.timebusName}:skip`, direction);
     },
   },
 };
 </script>
+
+<template lang="pug">
+v-toolbar.video-controls(shift, dense)
+  v-layout(row, align-center, wrap)
+    v-flex(shrink)
+      v-btn(icon, @click="skip(false)")
+        v-icon {{ $vuetify.icons.skipPrevious }}
+      v-btn(icon, @click="setPlaying({ playing: !playing })")
+        v-icon(v-show="playing") {{ $vuetify.icons.pause }}
+        v-icon(v-show="!playing") {{ $vuetify.icons.play }}
+      v-btn(icon, @click="skip(true)")
+        v-icon {{ $vuetify.icons.skipNext }}
+      time-stamp
+    v-flex.shrink
+      v-select.px-2(
+          @change="setPlaybackRate({ playbackRate: $event })",
+          :items="playbackRateOptions",
+          :value="playbackRate",
+          solo)
+        template(slot="item", slot-scope="props")
+          p {{ `${props.item}x Speed` }}
+        template(slot="selection", slot-scope="props")
+          span {{ `${props.item}x Speed`}}
+    v-flex
+      slot(name="widget")
+    v-flex.shrink
+      v-switch.px-2.flat(
+          v-if="withToggles"
+          label="labels",
+          hide-details,
+          :input-value="labels",
+          @change="setShowLabels({ labels: $event })")
+    v-flex.shrink
+      v-switch.px-2.flat(
+          v-if="withToggles"
+          label="shapes",
+          hide-details,
+          :input-value="shapes",
+          @change="setShowShapes({ shapes: $event })")
+    v-flex.shrink
+      v-select.px-2(
+          v-if="withToggles"
+          @change="updateColorBy",
+          :items="Object.keys(colorByOptions).map(c => colorByOptions[c])",
+          solo,
+          :value="colorByOptions[colorBy]")
+</template>
 
 <style lang='stylus'>
 .video-controls {

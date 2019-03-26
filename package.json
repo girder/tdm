@@ -1,14 +1,18 @@
 {
   "dependencies": {
+    "@girder/components": "^3.0.0-alpha.3",
+    "@mdi/font": "^3.6.95",
     "axios": "^0.18.0",
     "d3": "^5.8.0",
     "js-yaml": "^3.12.1",
+    "lodash": "^4.17.11",
     "material-design-icons-iconfont": "^4.0.3",
+    "panzoom": "^8.0.0",
     "stylus": "^0.54.5",
     "stylus-loader": "^3.0.2",
-    "vue": "^2.5.17",
+    "vue": "^2.6.10",
     "vue-async-computed": "^3.4.1",
-    "vuetify": "^1.2.8",
+    "vuetify": "^1.5.11",
     "vuex": "^3.1.0"
   },
   "devDependencies": {
@@ -26,12 +30,12 @@
     "stylelint": "^9.6.0",
     "stylelint-config-standard": "^18.2.0",
     "vue-cli-plugin-pug": "^1.0.7",
-    "vue-template-compiler": "^2.5.16"
+    "vue-template-compiler": "^2.6.10"
   },
   "scripts": {
     "serve": "vue-cli-service serve demo_app/main.js",
     "build": "vue-cli-service build --target lib --name tdm src/index.js",
-    "build:demo": "vue-cli-service build --dest _site/ demo_app/main.js",
+    "build:demo": "BASE_PATH=tdm/ vue-cli-service build --dest _site/ demo_app/main.js",
     "lint": "vue-cli-service lint",
     "lint:pug": "pug-lint-vue src",
     "lint:style": "stylelint 'src/**/*.vue'",

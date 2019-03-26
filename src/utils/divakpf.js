@@ -44,7 +44,7 @@ export const TIMERANGE_KEY = 'tsr0';
  * @param {File} inputFile
  * @returns {Promise} stringPromise
  */
-const readUploadedFileAsText = (inputFile, fallback) => {
+export const readUploadedFileAsText = (inputFile, fallback) => {
   const temporaryFileReader = new FileReader();
   return new Promise((resolve, reject) => {
     temporaryFileReader.onerror = (err) => {
@@ -92,7 +92,9 @@ export default class KPF {
    */
   postProcess() {
     this.geom = KPF.filterEmpty(this.geom, [GEOM_ACTOR_KEY, 'g0', 'ts0']);
-    this.activities = KPF.filterEmpty(this.activities, ['act2']);
+    if (this.activities) {
+      this.activities = KPF.filterEmpty(this.activities, ['act2']);
+    }
     this.types = KPF.filterEmpty(this.types, [GEOM_ACTOR_KEY]);
     const newTypes = {};
     this.types.forEach((t) => {
@@ -105,7 +107,7 @@ export default class KPF {
     this.geom = this.geom.map(g => ({
       ...g,
       bbox: g.bbox || g.g0.split(' ').map(f => parseFloat(f)),
-      ts0: g.ts0 || g.frame,
+      ts0: g.ts0 || g.frame || 0,
       [GEOM_ACTOR_KEY]: g[GEOM_ACTOR_KEY] || 0,
     }));
     this.geom.forEach((g) => {
@@ -116,23 +118,47 @@ export default class KPF {
         this.tracksByActor[key] = [g];
       }
     });
-    this.activities = this.activities.map(a => ({
-      ...a,
-      actors: a.actors.map(actor => ({
-        ...actor,
-        timespan: actor.timespan[0][TIMERANGE_KEY],
-        detections: KPF.filterRange(
-          this.tracksByActor[actor[GEOM_ACTOR_KEY]],
-          'ts0',
-          actor.timespan[0][TIMERANGE_KEY][0],
-          actor.timespan[0][TIMERANGE_KEY][1],
-        ),
-        type: this.types[actor[GEOM_ACTOR_KEY]]
-          ? this.types[actor[GEOM_ACTOR_KEY]].type
-          : 'Unknown',
-      })),
-      name: a.act2 ? Object.keys(a.act2)[0] : a.src, // TODO: this is terrible.
-    }));
+    if (this.activities) {
+      this.activities = this.activities.map(a => ({
+        ...a,
+        actors: a.actors.map(actor => ({
+          ...actor,
+          timespan: actor.timespan[0][TIMERANGE_KEY],
+          detections: KPF.filterRange(
+            this.tracksByActor[actor[GEOM_ACTOR_KEY]],
+            'ts0',
+            actor.timespan[0][TIMERANGE_KEY][0],
+            actor.timespan[0][TIMERANGE_KEY][1],
+          ),
+          type: this.types[actor[GEOM_ACTOR_KEY]]
+            ? this.types[actor[GEOM_ACTOR_KEY]].type
+            : 'Unknown',
+        })),
+        name: a.act2 ? Object.keys(a.act2)[0] : a.src, // TODO: this is terrible.
+      }));
+    } else {
+      this.activities = Object.keys(this.tracksByActor).map((track) => {
+        return {
+          id2: parseInt(track, 10),
+          name: track,
+          actors: [
+            {
+              timespan: [
+                this.tracksByActor[track][0]['ts0'],
+                this.tracksByActor[track][this.tracksByActor[track].length - 1]['ts0'],
+              ],
+              type: this.types[track].type,
+              detections: KPF.filterRange(
+                this.tracksByActor[track],
+                'ts0',
+                this.tracksByActor[track][0]['ts0'],
+                this.tracksByActor[track][this.tracksByActor[track].length - 1]['ts0'],
+              ),
+            },
+          ],
+        };
+      });
+    }
   }
 
   /**
@@ -175,16 +201,23 @@ export default class KPF {
         begin: t.timespan[0],
         end: t.timespan[1],
       };
-      const detections = t.detections.map((d, idx) => ({
-        frame: d.frame || d.ts0,
-        meta: {
-          src: d.src,
-          occlusion: d.occlusion,
-          confidence: (idx === 0 || (idx === t.detections.length - 1)) ? 0.001 : 1,
-        },
-        box: d.bbox,
-        track,
-      })).sort((a, b) => a.frame - b.frame);
+      const detections = [];
+      for (let idx = 0; idx < t.detections.length; idx += 1) {
+        const d = t.detections[idx];
+        const frame = d.frame || d.ts0;
+        // console.log(frame);
+        // break;
+        detections[idx] = {
+          frame,
+          meta: {
+            src: d.src,
+            occlusion: d.occlusion,
+            confidence: (idx === 0 || (idx === t.detections.length - 1)) ? 0.001 : 1,
+            ...track.meta,
+          },
+          box: d.bbox,
+        };
+      }
       track.detections = detections;
       return track;
     });
@@ -212,7 +245,10 @@ export default class KPF {
    * @param {String} geometryText
    */
   static fromText(activityText, geometryText, typeText) {
-    const activityJson = yaml.safeLoad(activityText).map(a => ({ ...a.act }));
+    let activityJson = null;
+    if (activityText) {
+      activityJson = yaml.safeLoad(activityText).map(a => ({ ...a.act }));
+    }
     const geometryJson = yaml.safeLoad(geometryText).map(g => ({ ...g.geom }));
     const typeJson = yaml.safeLoad(typeText).map(t => ({ ...t.types }));
     return new KPF(activityJson, geometryJson, typeJson);
@@ -224,12 +260,13 @@ export default class KPF {
    * @param {File} geometryFile
    */
   static async fromFiles(activityFile, geometryFile, typeFile) {
-    const promiseList = [
-      readUploadedFileAsText(activityFile),
-      readUploadedFileAsText(geometryFile),
-      readUploadedFileAsText(typeFile, '- {}'),
-    ];
-    const [activityText, geometryText, typeText] = await Promise.all(promiseList);
+    const promiseList = [];
+    promiseList.push(readUploadedFileAsText(geometryFile));
+    promiseList.push(readUploadedFileAsText(typeFile, '- {}'));
+    if (activityFile) {
+      promiseList.push(readUploadedFileAsText(activityFile));
+    }
+    const [geometryText, typeText, activityText] = await Promise.all(promiseList);
     return KPF.fromText(activityText, geometryText, typeText);
   }
 }

@@ -21,3 +21,9 @@ export const SEQUENCE_COLORS = [
   '#003c30',
 ];
 export const DISABLED_COLOR = '#a0a0a0';
+
+export const MODES = {
+  PAN: 1, // Dragging does pans
+  DRAG: 2, // Only callback on complete drag
+  HANDLE: 3, // Callback for moves, drags, mouseup, mousedown
+};
