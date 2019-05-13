@@ -205,8 +205,6 @@ export default class KPF {
       for (let idx = 0; idx < t.detections.length; idx += 1) {
         const d = t.detections[idx];
         const frame = d.frame || d.ts0;
-        // console.log(frame);
-        // break;
         detections[idx] = {
           frame,
           meta: {
@@ -218,7 +216,7 @@ export default class KPF {
           box: d.bbox,
         };
       }
-      track.detections = detections;
+      track.detections = detections.sort((a, b) => b.frame - a.frame);
       return track;
     });
   }

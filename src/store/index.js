@@ -51,8 +51,12 @@ const getters = {
       start = Math.round(endframe - 1);
       end = Math.round(endframe);
     }
+    if (start < 0 || end < 0) {
+      return [];
+    }
     return state.tracks
       .filter(trackinfo => !trackinfo.interpolated)
+      .filter(track => track.begin <= start)
       .map(track => ({
         track,
         detections: track.detections.slice(start - track.begin, end - track.begin),

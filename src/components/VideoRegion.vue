@@ -70,7 +70,11 @@ export default {
     mode: {
       type: Number,
       default: MODES.HANDLE
-    }
+    },
+    crossorigin: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -658,13 +662,13 @@ export default {
       canvas.static-canvas(ref="staticcanvas")
       canvas.canvas(ref="canvas")
       video(
-          crossorigin,
+          :crossorigin="crossorigin",
           ref="video",
           muted,
           :width="dimensions.width",
           :height="dimensions.height",
           @canplay="canPlay")
-        source(:src="url", crossorigin,
+        source(:src="url", :crossorigin="crossorigin",
             @error="$emit('error', $event)")
         h1 Could not load video.
 </template>
