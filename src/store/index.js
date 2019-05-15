@@ -48,8 +48,8 @@ const getters = {
     let start = Math.round(startframe);
     let end = Math.round(endframe + 1); // include the last frame
     if (endframe < startframe) {
-      start = Math.round(endframe - 1);
-      end = Math.round(endframe);
+      start = Math.round(endframe);
+      end = Math.round(endframe + 1);
     }
     if (start < 0 || end < 0) {
       return [];
@@ -143,6 +143,14 @@ const mutations = {
   removeTrack(state, { key }) {
     state.tracks = state.tracks.filter(t => t.key !== key);
   },
+
+  editTrack(state, { track }) {
+    const index = state.tracks.findIndex(t => t.key === track.key);
+    if (index >= 0) {
+      Vue.set(state.tracks, index, track);
+    }
+  },
+
   setDetection(state, { trackKey, frame, detection }) {
     const track = state.tracks.find(t => t.key === trackKey);
     if (track) {
@@ -262,6 +270,12 @@ const actions = {
     commit('setTracks', { tracks: state.tracks.concat(tracks) });
     commit('colorByMeta', { key });
     commit('resetState', { newstate: STATES.ACTIVE });
+    dispatch('_notify');
+  },
+
+  editTrack({ state, commit, dispatch }, { track }) {
+    commit('editTrack', { track });
+    commit('colorByMeta', { key: state.colorBy });
     dispatch('_notify');
   },
 

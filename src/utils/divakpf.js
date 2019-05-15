@@ -143,6 +143,7 @@ export default class KPF {
           name: track,
           actors: [
             {
+              [GEOM_ACTOR_KEY]: track,
               timespan: [
                 this.tracksByActor[track][0]['ts0'],
                 this.tracksByActor[track][this.tracksByActor[track].length - 1]['ts0'],

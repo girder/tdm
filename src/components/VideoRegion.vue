@@ -11,7 +11,7 @@ import { cpus } from 'os';
 const { mapState } = createNamespacedHelpers('tdm')
 
 // Shape Cache
-let frametime = -1;
+let frametime = 0;
 let current_shapes = [];
 let static_shapes = [];
 let follow_shape = null;
@@ -123,7 +123,6 @@ export default {
       const width = originalWidth;
       const height = originalHeight;
       const scale = videoWidth / width;
-      console.log(scale);
       return { width, height, originalWidth, originalHeight, scale };
     }
   },
@@ -204,7 +203,6 @@ export default {
       minZoom: 1,
       smoothScroll: false
     });
-    this.pzinstance.zoomAbs(0, 0, 1);
     this.pzinstance.on('zoom', e => {
       const { x, y, scale } = e.getTransform();
     });
@@ -226,7 +224,6 @@ export default {
 
     async _handleEvent(event_type, event) {
       const { video, framerate, videoWidth, videoHeight } = this;
-      const frametime = Math.round(video.currentTime * framerate);
       const { all, append, current, follow } = await this.handleEvent(
         frametime, event_type, event,
       );
@@ -245,7 +242,6 @@ export default {
      */
     resetStatic() {
       this.clearCanvas(this.staticctx);
-      const frametime = Math.round(this.video.currentTime * this.framerate);
       this.drawShapes({
         context: this.staticctx,
         shapeslist: static_shapes.slice(0, frametime),
@@ -304,7 +300,7 @@ export default {
           });
         }
       }
-
+      
       if (this.playing && !prevent) {
         this.animationId = window.requestAnimationFrame(d =>
           this.loop(d, false)
@@ -321,15 +317,16 @@ export default {
       follow = null,
     }) {
       
+      this.clearCanvas(this.ctx);
       if (current) {
         current_shapes = current;
-        this.clearCanvas(this.ctx);
         this.drawShapes({
           context: this.ctx,
           shapeslist: current,
           x, y, width, height,
         });
       }
+      this.drawStamp(this.ctx, frametime);
 
       if (follow) {
         this.follow(follow);
@@ -413,14 +410,14 @@ export default {
     /**
      * takes x, y in screen coordinates.
      */
-    drawDot(context, x, y, radius, color, width) {
+    drawDot(context, x, y, radius, color, width, outlineColor = 'black') {
       const ctx = context;
       ctx.lineWidth = width;
       ctx.globalAlpha = 0.8;
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = outlineColor;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(Math.floor(x), Math.floor(y), radius * CANVAS_SCALAR, 0, 2 * Math.PI);
+      ctx.arc(Math.round(x), Math.round(y), Math.round(radius * CANVAS_SCALAR), 0, 2 * Math.PI);
       ctx.stroke();
       ctx.fill();
       ctx.globalAlpha = 1.0;
@@ -431,12 +428,12 @@ export default {
      */
     drawLine(context, a, b, width, color) {
       const ctx = context;
-      ctx.lineWidth = width * CANVAS_SCALAR;
+      ctx.lineWidth = Math.round(width * CANVAS_SCALAR);
       ctx.globalAlpha = 0.8;
       ctx.strokeStyle = color;
       ctx.beginPath();
-      ctx.moveTo(a[0], a[1]);
-      ctx.lineTo(b[0], b[1]);
+      ctx.moveTo(Math.round(a[0]), Math.round(a[1]));
+      ctx.lineTo(Math.round(b[0]), Math.round(b[1]));
       ctx.stroke();
       ctx.globalAlpha = 1.0;
     },
@@ -449,7 +446,7 @@ export default {
       ctx.lineWidth = lineWidth;
       ctx.strokeStyle = color;
       ctx.beginPath();
-      ctx.rect(x, y, width, height);
+      ctx.rect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
       ctx.stroke();
     },
 
@@ -459,16 +456,17 @@ export default {
 
     drawStamp(context, frame) {
       // TODO: review
+      const { x, y } = this.pzinstance.getTransform();
       const ctx = context;
       ctx.fillStyle = 'black';
       ctx.font = '28px mono';
-      const frameText = `FRAME ${Math.floor(frame).toString()}`;
+      const frameText = `frame ${Math.round(frame).toString()}`;
       const frameTextWidth = ctx.measureText(frameText).width;
       ctx.globalAlpha = 0.6;
-      ctx.fillRect(0, 0, Math.floor(frameTextWidth) + 8, 24);
+      ctx.fillRect(0, 0, Math.floor(frameTextWidth) + 8, 32);
       ctx.globalAlpha = 1.0;
       ctx.fillStyle = 'white';
-      ctx.fillText(frameText, 4, 18);
+      ctx.fillText(frameText, 4, 26);
     },
 
     drawImage(context, x, y, src) {
@@ -482,9 +480,9 @@ export default {
       ctx.strokeStyle = textcolor;
       const textWidth = ctx.measureText(text).width;
       ctx.fillRect(
-        Math.floor(x - 2),
-        Math.floor(y - 2),
-        Math.floor(textWidth) + 4,
+        Math.round(x - 2),
+        Math.round(y - 2),
+        Math.round(textWidth) + 4,
         14
       );
       ctx.fillText(text, Math.floor(x), Math.floor(y));
@@ -514,7 +512,8 @@ export default {
                 p[1] - scaley,
                 data.radius,
                 color,
-                data.width
+                data.width,
+                data.outlineColor,
               );
               break;
 
@@ -583,13 +582,16 @@ export default {
       if (this.playing) {
         this.$refs.video.play();
         this.loopSetup();
+      } else {
+        this.debounceLoop();
       }
       this.$emit('init');
     },
 
     click(e) {
-      const frametime = Math.round(this.video.currentTime * this.framerate);
-      this.handleEvent(frametime, 'click', e);
+      const { layerX, layerY } = e;
+      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      this.handleEvent(frametime, 'click', { x: transformed[0], y: transformed[1] });
     },
 
     resetMouse() {
@@ -602,12 +604,21 @@ export default {
       if (!this.playing) this.loop();
     },
 
+    _convertToVideoCoordinates(x1, y1) {
+      const { dimensions, videoWidth, videoHeight } = this;
+      const { scale, x, y } = this.pzinstance.getTransform();
+      const { originalWidth, originalHeight } = dimensions;
+      const transformed = convert2d(x1 - x, y1 - y,
+        scaleBox([originalWidth, originalHeight], scale),
+        [videoWidth, videoHeight]);
+      return transformed;
+    },
+
     mousedown(e) {
-      const { dimensions } = this;
-      const { originalWidth, scale } = dimensions;
       const { layerX, layerY } = e;
-      const vx = layerX * scale;
-      const vy = layerY * scale;
+      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      const vx = transformed[0];
+      const vy = transformed[1];
       this.resetMouse();
       this.mouse.last_x = vx;
       this.mouse.last_y = vy;
@@ -628,12 +639,12 @@ export default {
     },
 
     async mousemove(e) {
-      const { dimensions, mode, pzinstance, url, mouse } = this;
-      const { originalWidth, scale } = dimensions;
-      const { x, y, scale: pzscale } = pzinstance.getTransform();
+      const { mode, url, mouse } = this;
       const { down_x, down_y } = mouse;
-      const last_x = ((e.layerX - x) / pzscale) * scale;
-      const last_y = ((e.layerY - y) / pzscale) * scale;
+      const { layerX, layerY } = e;
+      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      const last_x = transformed[0];
+      const last_y = transformed[1];
 
       if (this.mouse.drag && mode === MODES.DRAG) {
         const width = last_x - down_x;

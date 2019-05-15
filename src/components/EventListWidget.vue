@@ -53,7 +53,7 @@ export default {
               v-layout(row)
                 v-icon.pr-2(small,
                     :color="colormap[item.meta[colorBy]]",
-                    :style="{verticalAlign: 'text-top' }") brightness_1
+                    :style="{verticalAlign: 'text-top' }") {{ $vuetify.icons.circle }}
                 | {{ item.begin }} - {{ item.end }} ({{ item.end - item.begin}}s)
                 v-spacer
                 v-btn.pa-0.ma-0(icon, small, @click.stop="$emit('action', item)")

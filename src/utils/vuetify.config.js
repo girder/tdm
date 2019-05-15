@@ -5,5 +5,6 @@ export default {
     skipNext: 'mdi-skip-next',
     pause: 'mdi-pause',
     play: 'mdi-play',
+    circle: 'mdi-checkbox-blank-circle',
   },
 };
