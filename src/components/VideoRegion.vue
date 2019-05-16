@@ -667,7 +667,7 @@ export default {
 .video-region
   v-btn.closebutton.ma-0(v-if="dismissable", @click="$emit('dismiss')", fab, small)
     v-icon {{ $vuetify.icons.close }}
-  canvas.ma-4(ref="hiddencanvas")
+  canvas.ma-4.hidden(ref="hiddencanvas")
   v-layout.scroll-container(
       ref="scrollcontainer",
       column, align-start, justify-center, fill-height
@@ -715,5 +715,9 @@ canvas {
   margin: auto;
   transform: scale(.5) translate(-50%, -50%);
   left: 0;
+
+  .hidden {
+    display: none;
+  }
 }
 </style>
