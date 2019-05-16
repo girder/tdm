@@ -8,7 +8,7 @@ import { debounce, valBetween, convert2d, getPosition } from '../utils';
 import TimeBus from '../utils/timebus';
 import { cpus } from 'os';
 
-const { mapState } = createNamespacedHelpers('tdm')
+const { mapState, mapMutations } = createNamespacedHelpers('tdm')
 
 // Shape Cache
 let frametime = 0;
@@ -132,6 +132,7 @@ export default {
       this.$refs.video.playbackRate = newval;
     },
     dimensions() {
+      console.log('dimensions');
       const { ctx, staticctx, dimensions, url } = this;
       if (ctx && staticctx) {
         this.setupCanvas(ctx, dimensions.width * CANVAS_SCALAR, dimensions.height * CANVAS_SCALAR);
@@ -154,7 +155,7 @@ export default {
       }
     },
     url(newval) {
-      this.$refs.video.load();
+      this.video.load();
     },
     loading() {
       this.debounceLoop();
@@ -214,6 +215,8 @@ export default {
     this.drawInfo(this.ctx, 'Source Unavailable');
   },
   methods: {
+    ...mapMutations(['setWidth', 'setHeight']),
+
     updateTime(time) {
       this.$refs.video.currentTime = time;
       this.loop();
@@ -582,6 +585,9 @@ export default {
       } else {
         this.debounceLoop();
       }
+      const { videoWidth, videoHeight } = this.video;
+      this.setWidth({ width: videoWidth });
+      this.setHeight({ height: videoHeight });
       this.$emit('init');
     },
 
@@ -661,7 +667,7 @@ export default {
 .video-region
   v-btn.closebutton.ma-0(v-if="dismissable", @click="$emit('dismiss')", fab, small)
     v-icon {{ $vuetify.icons.close }}
-  canvas(ref="hiddencanvas", style="display: none;")
+  canvas.ma-4(ref="hiddencanvas")
   v-layout.scroll-container(
       ref="scrollcontainer",
       column, align-start, justify-center, fill-height
