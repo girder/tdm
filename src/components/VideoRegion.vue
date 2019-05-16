@@ -716,7 +716,7 @@ canvas {
   transform: scale(.5) translate(-50%, -50%);
   left: 0;
 
-  .hidden {
+  &.hidden {
     display: none;
   }
 }
