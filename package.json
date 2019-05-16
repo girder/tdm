@@ -42,7 +42,7 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "name": "tdm",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "index.js",
   "license": "MIT",
   "postcss": {

@@ -34,6 +34,7 @@ const debounce = (func, wait, immediate = false, count = NaN) => {
   };
 };
 
+// clamping
 function valBetween(v, min, max) {
   return (Math.min(max, Math.max(min, v)));
 }
@@ -99,10 +100,23 @@ function convert2d(x, y, system1, system2) {
   ];
 }
 
+// https://bugs.webkit.org/show_bug.cgi?id=21868#c21
+// https://www.kirupa.com/html5/getting_mouse_click_position.htm
+function getPosition(event) {
+  const e = event || window.event;
+  const target = e.target || e.srcElement;
+  const rect = target.getBoundingClientRect();
+  const offsetX = e.clientX - rect.left;
+  const offsetY = e.clientY - rect.top;
+
+  return { offsetX, offsetY };
+}
+
 export {
   convert2d,
   debounce,
   getParams,
+  getPosition,
   tdm,
   valBetween,
   fillMissingDetections,

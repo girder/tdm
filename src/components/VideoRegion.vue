@@ -4,7 +4,7 @@ import { createNamespacedHelpers } from 'vuex'
 import { scaleBox } from '../utils/tdm';
 import { STATES, SHAPES, centroid } from '../utils/tdm';
 import { MODES } from '../constants';
-import { debounce, valBetween, convert2d } from '../utils';
+import { debounce, valBetween, convert2d, getPosition } from '../utils';
 import TimeBus from '../utils/timebus';
 import { cpus } from 'os';
 
@@ -202,9 +202,6 @@ export default {
       maxZoom: 6,
       minZoom: 1,
       smoothScroll: false
-    });
-    this.pzinstance.on('zoom', e => {
-      const { x, y, scale } = e.getTransform();
     });
     if (this.mode === MODES.DRAG) {
       this.pzinstance.pause();
@@ -413,7 +410,7 @@ export default {
     drawDot(context, x, y, radius, color, width, outlineColor = 'black') {
       const ctx = context;
       ctx.lineWidth = width;
-      ctx.globalAlpha = 0.8;
+      ctx.globalAlpha = 0.7;
       ctx.strokeStyle = outlineColor;
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -589,8 +586,8 @@ export default {
     },
 
     click(e) {
-      const { layerX, layerY } = e;
-      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      const { offsetX, offsetY } = getPosition(e);
+      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
       this.handleEvent(frametime, 'click', { x: transformed[0], y: transformed[1] });
     },
 
@@ -606,17 +603,17 @@ export default {
 
     _convertToVideoCoordinates(x1, y1) {
       const { dimensions, videoWidth, videoHeight } = this;
-      const { scale, x, y } = this.pzinstance.getTransform();
+      const { scale } = this.pzinstance.getTransform();
       const { originalWidth, originalHeight } = dimensions;
-      const transformed = convert2d(x1 - x, y1 - y,
+      const transformed = convert2d(x1, y1,
         scaleBox([originalWidth, originalHeight], scale),
         [videoWidth, videoHeight]);
       return transformed;
     },
 
     mousedown(e) {
-      const { layerX, layerY } = e;
-      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      const { offsetX, offsetY } = getPosition(e);
+      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
       const vx = transformed[0];
       const vy = transformed[1];
       this.resetMouse();
@@ -641,8 +638,8 @@ export default {
     async mousemove(e) {
       const { mode, url, mouse } = this;
       const { down_x, down_y } = mouse;
-      const { layerX, layerY } = e;
-      const transformed = this._convertToVideoCoordinates(layerX, layerY);
+      const { offsetX, offsetY } = getPosition(e);
+      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
       const last_x = transformed[0];
       const last_y = transformed[1];
 
