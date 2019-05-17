@@ -75,6 +75,14 @@ export default {
       type: Boolean,
       default: false,
     },
+    imgsrc: {
+      type: String,
+      default: null,
+    },
+    noSourceMessage: {
+      type: String,
+      default: 'Source Unavailable',
+    }
   },
   data() {
     return {
@@ -129,24 +137,23 @@ export default {
 
   watch: {
     playbackRate(newval) {
-      this.$refs.video.playbackRate = newval;
+      this.video.playbackRate = newval;
     },
     dimensions() {
-      console.log('dimensions');
-      const { ctx, staticctx, dimensions, url } = this;
+      const { ctx, staticctx, dimensions, url, imgsrc, noSourceMessage } = this;
       if (ctx && staticctx) {
         this.setupCanvas(ctx, dimensions.width * CANVAS_SCALAR, dimensions.height * CANVAS_SCALAR);
         this.setupCanvas(staticctx, dimensions.width * CANVAS_SCALAR, dimensions.height * CANVAS_SCALAR);
         this.resetStatic();
-        if (!url) {
-          this.drawInfo(ctx, 'Source Unavailable');
+        if (!url && !imgsrc) {
+          this.drawInfo(ctx, noSourceMessage);
         } else {
           this.loop();
         }
       }
     },
     playing(playing) {
-      const v = this.$refs.video;
+      const v = this.video;
       if (playing) {
         v.play();
         this.loopSetup();
@@ -156,6 +163,9 @@ export default {
     },
     url(newval) {
       this.video.load();
+    },
+    imgsrc(newval) {
+      this.loadImage(newval);
     },
     loading() {
       this.debounceLoop();
@@ -172,6 +182,7 @@ export default {
   beforeDestroy() {
     window.removeEventListener('mouseup', this.mouseup, false);
     TimeBus.$off(`${this.timebusName}:active`, this.updateTime);
+    TimeBus.$off(`${this.timebusName}:skip`, this.skip);
     this.$refs.canvas.removeEventListener('click', this.click, false);
     this.$refs.canvas.removeEventListener('mousedown', this.mousedown, false);
     this.$refs.canvas.removeEventListener('mousemove', this.mousemove, false);
@@ -188,12 +199,12 @@ export default {
     const emitTime = () =>
       TimeBus.$emit(
         `${this.timebusName}:passive`,
-        this.$refs.video.currentTime
+        this.video.currentTime
       );
     this.debounceTime = debounce(emitTime, 80, false, 1);
     this.debounceLoop = debounce(this.loop, 100);
     TimeBus.$on(`${this.timebusName}:active`, this.updateTime);
-    
+    TimeBus.$on(`${this.timebusName}:skip`, this.skip);
     // The following may be Zero-width if parent has not yet computed the width.
     const { width, height } = this.dimensions;
     this.setupCanvas(this.ctx, width * CANVAS_SCALAR, height * CANVAS_SCALAR);
@@ -212,14 +223,22 @@ export default {
     this.$refs.canvas.addEventListener('mousemove', this.mousemove, false);
     window.addEventListener('mouseup', this.mouseup, false);
     this.resetStatic();
-    this.drawInfo(this.ctx, 'Source Unavailable');
+    this.drawInfo(this.ctx, this.noSourceMessage);
+
+    if (this.imgsrc) {
+      this.loadImage(this.imgsrc);
+    }
   },
   methods: {
-    ...mapMutations(['setWidth', 'setHeight']),
+    ...mapMutations(['setWidth', 'setHeight', 'setDuration']),
 
     updateTime(time) {
-      this.$refs.video.currentTime = time;
+      this.video.currentTime = time;
       this.loop();
+    },
+
+    skip(direction) {
+      this.video.currentTime += direction * 5;
     },
 
     async _handleEvent(event_type, event) {
@@ -264,24 +283,22 @@ export default {
     },
 
     loop(delta, prevent = true) {
-      const $video = this.video;
-      const offset = this.offset;
-      const duration = this.duration;
+      const { video, offset, duration } = this;
       const lastframe = frametime;
-      const thisFrame = Math.round($video.currentTime * this.framerate);
+      const thisFrame = Math.round(video.currentTime * this.framerate);
 
       // TODO: this logic can probably be simplified.
-      if ($video.currentTime < offset) {
-        // $video.currentTime = offset;
+      if (video.currentTime < offset) {
+        // video.currentTime = offset;
         TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
       } else if (
         !prevent &&
-        $video.currentTime > offset + duration &&
+        video.currentTime > offset + duration &&
         this.timebusName === 'master'
       ) {
         // reset clock to offset
         TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
-      } else if ((!$video.ended && thisFrame !== lastframe) || prevent) {
+      } else if ((!video.ended && thisFrame !== lastframe) || prevent) {
         frametime = thisFrame;
         // Only emit passive events to the master timebus
         if (this.timebusName === 'master') {
@@ -572,7 +589,7 @@ export default {
       const hiddenCanvas = this.$refs.hiddencanvas;
       const hiddenCtx = hiddenCanvas.getContext('2d');
       this.setupCanvas(hiddenCtx, width, height);
-      hiddenCtx.drawImage(this.$refs.video, x, y, width, height, 0, 0, width, height);
+      hiddenCtx.drawImage(this.video, x, y, width, height, 0, 0, width, height);
       return hiddenCanvas;
     },
 
@@ -580,15 +597,29 @@ export default {
 
     canPlay() {
       if (this.playing) {
-        this.$refs.video.play();
+        this.video.play();
         this.loopSetup();
       } else {
         this.debounceLoop();
       }
-      const { videoWidth, videoHeight } = this.video;
+      const { videoWidth, videoHeight, duration } = this.video;
       this.setWidth({ width: videoWidth });
       this.setHeight({ height: videoHeight });
+      this.setDuration({ duration });
       this.$emit('init');
+    },
+
+    loadImage(src) {
+      var newImg = new Image();
+      newImg.onload = () => {
+        const { width, height } = newImg;
+        this.setWidth({ width });
+        this.setHeight({ height });
+        this.setDuration({ duration: 1 / this.framerate });
+        this.$emit('init');
+      }
+      newImg.src = src;
+      this.$refs.image.src = src;
     },
 
     click(e) {
@@ -642,7 +673,7 @@ export default {
     },
 
     async mousemove(e) {
-      const { mode, url, mouse } = this;
+      const { mode, url, imgsrc, mouse } = this;
       const { down_x, down_y } = mouse;
       const { offsetX, offsetY } = getPosition(e);
       const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
@@ -653,7 +684,7 @@ export default {
         const width = last_x - down_x;
         const height = last_y - down_y;
         this._handleEvent('drag', { width, height, x: down_x, y: down_y });
-      } else if (mode === MODES.HANDLE && url) {
+      } else if (mode === MODES.HANDLE && (url || imgsrc)) {
         this._handleEvent('move', { x: last_x, y: last_y })
       }
       this.mouse.last_x = last_x;
@@ -679,12 +710,15 @@ export default {
           :crossorigin="crossorigin",
           ref="video",
           muted,
-          :width="dimensions.width",
+          :width="url ? dimensions.width : 0",
           :height="dimensions.height",
           @canplay="canPlay")
         source(:src="url", :crossorigin="crossorigin",
             @error="$emit('error', $event)")
         h1 Could not load video.
+      img(v-if="imgsrc", ref="image",
+          :width="dimensions.width",
+          :height="dimensions.height")
 </template>
 
 <style lang="scss" scoped>
