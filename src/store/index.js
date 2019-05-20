@@ -4,7 +4,7 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 
-import { interpolateFrames, eventsForThreshold, STATES } from '../utils/tdm';
+import { eventsForThreshold, STATES } from '../utils/tdm';
 import { CONTRAST_COLORS, SEQUENCE_COLORS, DISABLED_COLOR } from '../constants';
 
 Vue.use(Vuex);
@@ -17,8 +17,8 @@ const state = {
   cache: {}, // Object<String, Array<Track>> reverse map of metadata value to tracks with that value
   colorBy: '', // String metadata category to color by
   preselect: '', // String metadata value.
-  notifier: () => {},
-  /* Video state */
+  notifier: { notify: () => {} },
+  /* Video state: optional, can control per-component */
   url: '',
   width: 1920,
   height: 1080,
@@ -26,7 +26,6 @@ const state = {
   duration: 300, // seconds
   originalDuration: 300, // seconds
   offset: 0, // seconds
-
   /* Control state */
   playbackRate: 1,
   labels: false,
@@ -140,6 +139,7 @@ const mutations = {
     });
     state.tracks = tracks;
   },
+
   removeTrack(state, { key }) {
     state.tracks = state.tracks.filter(t => t.key !== key);
   },
@@ -157,6 +157,7 @@ const mutations = {
       Vue.set(track.detections, frame - track.begin, detection);
     }
   },
+
   setNotifier(state, { notifier }) {
     state.notifier = notifier;
   },

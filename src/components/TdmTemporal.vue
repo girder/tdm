@@ -6,7 +6,7 @@ v-card.tdmtemporal.pa-1.pr-3.my-0(tile)
         v-bind="{ events }",
         @dropcursors="dropcursors")
     .tdmtemporalGraph.grow
-      time-slider(style="width: 100%", :followers="followers")
+      time-slider(style="width: 100%", v-bind="{ timebusName, duration, offset, framerate, followers }")
       .wrapper(style="width: 100%", ref="svgcontainer")
         svg(@mousemove="", :width="width", :height="height", ref="barsvg")
           g(v-for="group in groups", :style="{ transform: `translate(0px, ${group.top}px)`}")
@@ -77,6 +77,18 @@ export default {
       type: Array,
       required: true,
     },
+    offset: {
+      type: Number,
+      default: 0,
+    },
+    duration: {
+      type: Number,
+      required: true,
+    },
+    framerate: {
+      type: Number,
+      default: 30,
+    },
     threshold: {
       validator: prop => typeof prop === 'number' || prop === null,
       required: true,
@@ -128,7 +140,6 @@ export default {
 
   computed: {
     ...mapState([
-      'offset', 'duration', 'framerate',
       'colorBy', 'thresholdKey',
       'originalDuration', 'thresholdMin',
       'thresholdMax',
@@ -256,7 +267,7 @@ export default {
   },
 
   methods: {
-    ...mapMutations(['setThreshold', 'setOffset', 'setDuration', 'setThreshBounds']),
+    ...mapMutations(['setThreshold', 'setThreshBounds']),
 
     settime(time) { this.time = time - this.offset; },
 
@@ -269,8 +280,8 @@ export default {
     },
 
     setRange(event) {
-      this.setOffset({ offset: event[0] });
-      this.setDuration({ duration: event[1] - event[0] });
+      this.$emit('update:duration', event[1] - event[0]);
+      this.$emit('update:offset', event[0]);
     },
 
     dropcursors(groupBy) {

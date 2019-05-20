@@ -1,6 +1,4 @@
 <script>
-import { createNamespacedHelpers } from 'vuex'
-const { mapState } = createNamespacedHelpers('tdm')
 import TimeBus from '../utils/timebus';
 
 export default {
@@ -8,6 +6,18 @@ export default {
     timebusName: {
       type: String,
       default: 'master',
+    },
+    duration: {
+      type: Number, // Seconds
+      required: true,
+    },
+    offset: {
+      type: Number, // Seconds
+      default: 0,
+    },
+    framerate: {
+      type: Number,
+      default: 30,
     },
     /* Array<{
      *   name: String, // name of the follower bus.
@@ -25,15 +35,9 @@ export default {
     };
   },
   mounted() {
-    TimeBus.$on(`${this.timebusName}:active`, time => (this.time = time));
     TimeBus.$on(`${this.timebusName}:passive`, time => (this.time = time));
   },
   computed: {
-    ...mapState({
-      duration: 'duration',
-      framerate: 'framerate',
-      offset: 'offset',
-    }),
     step() {
       return 1 / this.framerate;
     },

@@ -15,7 +15,7 @@ v-layout(column, justify-space-between, align-content-space-around)
       v-btn.ma-0.pa-0.add-cursor(
           absolute, right, small, icon,
           @click="$emit('dropcursors', k)")
-        v-icon mdi-chart-timeline
+        v-icon {{ $vuetify.icons.timeline }}
 </template>
 
 <script>

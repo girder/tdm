@@ -3,21 +3,33 @@ span.px-1 {{ toTimeStamp(time) }} / {{ end }}
 </template>
 
 <script>
-import { createNamespacedHelpers } from 'vuex'
-const { mapState } = createNamespacedHelpers('tdm')
 import TimeBus from '../utils/timebus';
 
 export default {
+  props: {
+    timebusName: {
+      type: String,
+      default: 'master',
+    },
+    offset: {
+      type: Number, // Seconds
+      default: 0,
+    },
+    duration: {
+      type: Number, // Seconds
+      required: true,
+    },
+  },
   data() {
     return {
       time: 0,
     };
   },
   mounted() {
-    TimeBus.$on('master:passive', this.updateTime);
+    TimeBus.$on(`${this.timebusName}:passive`, this.updateTime);
   },
   beforeDestroy() {
-    TimeBus.$off('master:passive', this.updateTime)
+    TimeBus.$off(`${this.timebusName}:passive`, this.updateTime);
   },
   methods: {
     updateTime(time) {
@@ -33,7 +45,6 @@ export default {
     },
   },
   computed: {
-    ...mapState(['offset', 'duration']),
     end() { return this.toTimeStamp(this.offset + this.duration) },
   },
 }

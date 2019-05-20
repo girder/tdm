@@ -6,7 +6,6 @@
     "d3": "^5.8.0",
     "js-yaml": "^3.12.1",
     "lodash": "^4.17.11",
-    "material-design-icons-iconfont": "^4.0.3",
     "panzoom": "^8.0.0",
     "stylus": "^0.54.5",
     "stylus-loader": "^3.0.2",

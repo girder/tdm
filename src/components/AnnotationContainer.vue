@@ -25,10 +25,6 @@ export default {
       type: String,
       required: true,
     },
-    playing: {
-      type: Boolean,
-      required: true,
-    },
     containerWidth: {
       /* Width of the canvas in pixels */
       type: Number,
@@ -45,18 +41,6 @@ export default {
     sourceHeight: {
       type: Number,
       required: true,
-    },
-    duration: {
-      type: Number,
-      required: true,
-    },
-    offset: {
-      type: Number,
-      default: 0,
-    },
-    framerate: {
-      type: Number,
-      default: 30,
     },
     loading: {
       type: Boolean,
@@ -93,10 +77,6 @@ export default {
       type: Number,
       default: MODES.HANDLE
     },
-    crossorigin: {
-      type: Boolean,
-      default: false,
-    },
     noSourceMessage: {
       type: String,
       default: 'Source Unavailable',
@@ -113,8 +93,6 @@ export default {
         last_x: 0,
         last_y: 0
       },
-      timeGetter: () => 0,
-      animationId: null,
     };
   },
   computed: {
@@ -206,12 +184,8 @@ export default {
   },
   methods: {
 
-    emitTime(time) {
-      TimeBus.$emit(`${this.timebusName}:passive`, time);
-    },
-
     async _handleEvent(event_type, event) {
-      const { framerate, sourceWidth, sourceHeight } = this;
+      const { sourceWidth, sourceHeight } = this;
       const { all, append, current, follow } = await this.handleEvent(
         frametime, event_type, event,
       );
@@ -240,61 +214,24 @@ export default {
       });
     },
 
-    setTimeGetter(tg) {
-      this.timeGetter = tg;
-    },
-
     /**
      * This function should be used to guarantee that loop is invoked
      * with prevent=false.
      */
-    update(prevent = true) {
-      if (this.animationId && !prevent) {
-        window.cancelAnimationFrame(this.animationId);
-      }
-      this.loop(0, prevent);
-    },
+    update(thisFrame, lastframe) {
+      frametime = thisFrame;
 
-    loop(delta, prevent) {
-      const { offset, duration } = this;
-      const lastframe = frametime;
-      const currentTime = this.timeGetter();
-      const thisFrame = Math.round(currentTime * this.framerate);
-
-      // TODO: this logic can probably be simplified.
-      if (currentTime < offset) {
-        TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
-      } else if (
-        !prevent &&
-        currentTime > offset + duration &&
-        this.timebusName === 'master'
-      ) {
-        // reset clock to offset
-        TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
-      } else if ((thisFrame !== lastframe) || prevent) {
-        frametime = thisFrame;
-        // Only emit passive events to the master timebus
-        if (this.timebusName === 'master') {
-          this.emitTime(currentTime);
-        }
-        if (this.loading) {
-          this.clearCanvas(this.ctx);
-          this.drawInfo(this.ctx, 'LOADING...');
-        } else {
-          const { all, append, current, follow } = this.getShapes(frametime, lastframe);
-          this.processShapes({
-            all, append, current, follow, lastframe, frametime,
-            x: 0, y: 0,
-            width: this.sourceWidth,
-            height: this.sourceHeight
-          });
-        }
-      }
-      
-      if (this.playing && !prevent) {
-        this.animationId = window.requestAnimationFrame(d =>
-          this.loop(d, false)
-        );
+      if (this.loading) {
+        this.clearCanvas(this.ctx);
+        this.drawInfo(this.ctx, 'LOADING...');
+      } else {
+        const { all, append, current, follow } = this.getShapes(frametime, lastframe);
+        this.processShapes({
+          all, append, current, follow, lastframe, frametime,
+          x: 0, y: 0,
+          width: this.sourceWidth,
+          height: this.sourceHeight
+        });
       }
     },
 
@@ -577,8 +514,7 @@ export default {
         height: 0,
         drag: false
       };
-      // TODO
-      if (!this.playing) this.loop();
+      this.update();
     },
 
     _convertToSourceCoordinates(x1, y1) {
@@ -665,7 +601,7 @@ export default {
       canvas.static-canvas(ref="staticcanvas")
       canvas.canvas(ref="canvas")
       slot(name="source",
-          v-bind="{ width: dimensions.width, height: dimensions.height, update, src, timebusName, playing, setTimeGetter }")
+          v-bind="{ width: dimensions.width, height: dimensions.height, update, src, timebusName }")
 </template>
 
 <style lang="scss" scoped>

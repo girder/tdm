@@ -1,14 +1,31 @@
 <script>
-import { createNamespacedHelpers } from 'vuex'
-const { mapState, mapActions, mapMutations } = createNamespacedHelpers('tdm')
+import { createNamespacedHelpers } from 'vuex';
 import TimeStamp from './TimeStamp';
 import TimeBus from '../utils/timebus';
+
+const { mapState, mapMutations, mapActions } = createNamespacedHelpers('tdm');
 
 export default {
   props: {
     colorByOptions: {
       type: Object,
       required: true,
+    },
+    duration: {
+      type: Number, // Seconds
+      required: true,
+    },
+    offset: {
+      type: Number, // Seconds
+      default: 0,
+    },
+    playing: {
+      type: Boolean,
+      required: true,
+    },
+    playbackRate: {
+      type: Number,
+      default: 1,
     },
     playbackRateOptions: {
       type: Array,
@@ -23,27 +40,21 @@ export default {
       default: 'master',
     },
   },
-  
+
   components: { TimeStamp },
-  
+
   data() {
     return { scrubbing: false };
   },
 
   computed: mapState([
-    'duration',
-    'offset',
     'colorBy',
-    'playbackRate',
     'labels',
     'shapes',
-    'playing',
   ]),
 
   methods: {
     ...mapMutations([
-      'setPlaying',
-      'setPlaybackRate',
       'setShowLabels',
       'setShowShapes',
     ]),
@@ -71,15 +82,15 @@ v-toolbar.video-controls(shift, dense)
     v-flex(shrink)
       v-btn(icon, @click="skip(false)")
         v-icon {{ $vuetify.icons.skipPrevious }}
-      v-btn(icon, @click="setPlaying({ playing: !playing })")
+      v-btn(icon, @click="$emit('update:playing', !playing )")
         v-icon(v-show="playing") {{ $vuetify.icons.pause }}
         v-icon(v-show="!playing") {{ $vuetify.icons.play }}
       v-btn(icon, @click="skip(true)")
         v-icon {{ $vuetify.icons.skipNext }}
-      time-stamp
+      time-stamp(v-bind="{ duration, offset, timebusName }")
     v-flex.shrink
       v-select.px-2(
-          @change="setPlaybackRate({ playbackRate: $event })",
+          @change="$emit('update:playbackRate', $event )",
           :items="playbackRateOptions",
           :value="playbackRate",
           solo)
