@@ -1,14 +1,12 @@
 <script>
 import panzoom from 'panzoom';
-import { createNamespacedHelpers } from 'vuex'
+
 import { scaleBox } from '../utils/tdm';
 import { STATES, SHAPES, centroid } from '../utils/tdm';
 import { MODES } from '../constants';
 import { debounce, valBetween, convert2d, getPosition } from '../utils';
 import TimeBus from '../utils/timebus';
 import { cpus } from 'os';
-
-const { mapState, mapMutations } = createNamespacedHelpers('tdm')
 
 // Shape Cache
 let frametime = 0;
@@ -20,9 +18,17 @@ const MAX_ZOOM = 5;
 const MIN_ZOOM = 1;
 
 const CANVAS_SCALAR = 2;
-
+ 
 export default {
   props: {
+    src: {
+      type: String,
+      required: true,
+    },
+    playing: {
+      type: Boolean,
+      required: true,
+    },
     containerWidth: {
       /* Width of the canvas in pixels */
       type: Number,
@@ -32,9 +38,25 @@ export default {
       type: Number,
       required: true
     },
-    defaultColor: {
-      type: String,
-      default: 'yellow'
+    sourceWidth: {
+      type: Number,
+      required: true,
+    },
+    sourceHeight: {
+      type: Number,
+      required: true,
+    },
+    duration: {
+      type: Number,
+      required: true,
+    },
+    offset: {
+      type: Number,
+      default: 0,
+    },
+    framerate: {
+      type: Number,
+      default: 30,
     },
     loading: {
       type: Boolean,
@@ -75,14 +97,10 @@ export default {
       type: Boolean,
       default: false,
     },
-    imgsrc: {
-      type: String,
-      default: null,
-    },
     noSourceMessage: {
       type: String,
       default: 'Source Unavailable',
-    }
+    },
   },
   data() {
     return {
@@ -95,81 +113,51 @@ export default {
         last_x: 0,
         last_y: 0
       },
-      video: null,
+      timeGetter: () => 0,
       animationId: null,
-      debounceTime: () => {},
-      debounceLoop: () => {},
     };
   },
   computed: {
-    ...mapState([
-      'url',
-      'framerate',
-      'duration',
-      'offset',
-      'playbackRate',
-      'playing'
-    ]),
-    ...mapState({
-      videoWidth: 'width',
-      videoHeight: 'height'
-    }),
-
     dimensions() {
       const {
         containerWidth,
         containerHeight,
-        videoWidth,
-        videoHeight,
+        sourceWidth,
+        sourceHeight,
         zoom
       } = this;
-      let originalWidth = containerWidth;
-      let originalHeight = (containerWidth / videoWidth) * videoHeight;
-      if (originalHeight > containerHeight) {
+      let screenWidth = containerWidth;
+      let screenHeight = (containerWidth / sourceWidth) * sourceHeight;
+      if (screenHeight > containerHeight) {
         // TODO: return width where height is limiting factor.
       }
-      const width = originalWidth;
-      const height = originalHeight;
-      const scale = videoWidth / width;
-      return { width, height, originalWidth, originalHeight, scale };
+      const width = screenWidth;
+      const height = screenHeight;
+      const scale = sourceWidth / width;
+      return { width, height, screenWidth, screenHeight, scale };
     }
   },
 
   watch: {
-    playbackRate(newval) {
-      this.video.playbackRate = newval;
-    },
+    
     dimensions() {
-      const { ctx, staticctx, dimensions, url, imgsrc, noSourceMessage } = this;
+      const { ctx, staticctx, dimensions, src, noSourceMessage } = this;
       if (ctx && staticctx) {
         this.setupCanvas(ctx, dimensions.width * CANVAS_SCALAR, dimensions.height * CANVAS_SCALAR);
         this.setupCanvas(staticctx, dimensions.width * CANVAS_SCALAR, dimensions.height * CANVAS_SCALAR);
         this.resetStatic();
-        if (!url && !imgsrc) {
+        if (!src) {
           this.drawInfo(ctx, noSourceMessage);
         } else {
-          this.loop();
+          this.update();
         }
       }
     },
-    playing(playing) {
-      const v = this.video;
-      if (playing) {
-        v.play();
-        this.loopSetup();
-      } else {
-        v.pause();
-      }
-    },
-    url(newval) {
-      this.video.load();
-    },
-    imgsrc(newval) {
-      this.loadImage(newval);
-    },
+
     loading() {
-      this.debounceLoop();
+      this.update();
     },
+
     mode(newval) {
       if (newval === MODES.DRAG) {
         this.pzinstance.pause();
@@ -181,8 +169,6 @@ export default {
 
   beforeDestroy() {
     window.removeEventListener('mouseup', this.mouseup, false);
-    TimeBus.$off(`${this.timebusName}:active`, this.updateTime);
-    TimeBus.$off(`${this.timebusName}:skip`, this.skip);
     this.$refs.canvas.removeEventListener('click', this.click, false);
     this.$refs.canvas.removeEventListener('mousedown', this.mousedown, false);
     this.$refs.canvas.removeEventListener('mousemove', this.mousemove, false);
@@ -194,23 +180,13 @@ export default {
     this.ctx = this.$refs.canvas.getContext('2d');
     // context for static (past) drawables that don't change much
     this.staticctx = this.$refs.staticcanvas.getContext('2d');
-    this.video = this.$refs.video;
     
-    const emitTime = () =>
-      TimeBus.$emit(
-        `${this.timebusName}:passive`,
-        this.video.currentTime
-      );
-    this.debounceTime = debounce(emitTime, 80, false, 1);
-    this.debounceLoop = debounce(this.loop, 100);
-    TimeBus.$on(`${this.timebusName}:active`, this.updateTime);
-    TimeBus.$on(`${this.timebusName}:skip`, this.skip);
     // The following may be Zero-width if parent has not yet computed the width.
     const { width, height } = this.dimensions;
     this.setupCanvas(this.ctx, width * CANVAS_SCALAR, height * CANVAS_SCALAR);
     this.setupCanvas(this.staticctx, width * CANVAS_SCALAR, height * CANVAS_SCALAR);
     // this.resetMouse();
-    this.pzinstance = panzoom(this.$refs.videocontainer, {
+    this.pzinstance = panzoom(this.$refs.canvascontainer, {
       maxZoom: 6,
       minZoom: 1,
       smoothScroll: false
@@ -222,27 +198,20 @@ export default {
     this.$refs.canvas.addEventListener('mousedown', this.mousedown, false);
     this.$refs.canvas.addEventListener('mousemove', this.mousemove, false);
     window.addEventListener('mouseup', this.mouseup, false);
-    this.resetStatic();
-    this.drawInfo(this.ctx, this.noSourceMessage);
-
-    if (this.imgsrc) {
-      this.loadImage(this.imgsrc);
-    }
+    
+    if (!this.src)
+      this.drawInfo(this.ctx, this.noSourceMessage);
+    else
+      this.update();
   },
   methods: {
-    ...mapMutations(['setWidth', 'setHeight', 'setDuration']),
 
-    updateTime(time) {
-      this.video.currentTime = time;
-      this.loop();
-    },
-
-    skip(direction) {
-      this.video.currentTime += direction * 5;
+    emitTime(time) {
+      TimeBus.$emit(`${this.timebusName}:passive`, time);
     },
 
     async _handleEvent(event_type, event) {
-      const { video, framerate, videoWidth, videoHeight } = this;
+      const { framerate, sourceWidth, sourceHeight } = this;
       const { all, append, current, follow } = await this.handleEvent(
         frametime, event_type, event,
       );
@@ -251,8 +220,8 @@ export default {
         lastframe: frametime,
         frametime,
         x: 0, y: 0,
-        width: videoWidth,
-        height: videoHeight
+        width: sourceWidth,
+        height: sourceHeight
       });
     },
 
@@ -266,43 +235,47 @@ export default {
         shapeslist: static_shapes.slice(0, frametime),
         x: 0,
         y: 0,
-        width: this.videoWidth,
-        height: this.videoHeight
+        width: this.sourceWidth,
+        height: this.sourceHeight
       });
+    },
+
+    setTimeGetter(tg) {
+      this.timeGetter = tg;
     },
 
     /**
      * This function should be used to guarantee that loop is invoked
      * with prevent=false.
      */
-    loopSetup() {
-      if (this.animationId) {
+    update(prevent = true) {
+      if (this.animationId && !prevent) {
         window.cancelAnimationFrame(this.animationId);
       }
-      this.loop(0, false);
+      this.loop(0, prevent);
     },
 
-    loop(delta, prevent = true) {
-      const { video, offset, duration } = this;
+    loop(delta, prevent) {
+      const { offset, duration } = this;
       const lastframe = frametime;
-      const thisFrame = Math.round(video.currentTime * this.framerate);
+      const currentTime = this.timeGetter();
+      const thisFrame = Math.round(currentTime * this.framerate);
 
       // TODO: this logic can probably be simplified.
-      if (video.currentTime < offset) {
-        // video.currentTime = offset;
+      if (currentTime < offset) {
         TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
       } else if (
         !prevent &&
-        video.currentTime > offset + duration &&
+        currentTime > offset + duration &&
         this.timebusName === 'master'
       ) {
         // reset clock to offset
         TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
-      } else if ((!video.ended && thisFrame !== lastframe) || prevent) {
+      } else if ((thisFrame !== lastframe) || prevent) {
         frametime = thisFrame;
         // Only emit passive events to the master timebus
         if (this.timebusName === 'master') {
-          this.debounceTime();
+          this.emitTime(currentTime);
         }
         if (this.loading) {
           this.clearCanvas(this.ctx);
@@ -312,8 +285,8 @@ export default {
           this.processShapes({
             all, append, current, follow, lastframe, frametime,
             x: 0, y: 0,
-            width: this.videoWidth,
-            height: this.videoHeight
+            width: this.sourceWidth,
+            height: this.sourceHeight
           });
         }
       }
@@ -377,14 +350,14 @@ export default {
     },
 
     follow(follow) {
-      const { videoWidth, videoHeight, dimensions, pzinstance } = this;
-      const { originalWidth, originalHeight } = dimensions;
+      const { sourceWidth, sourceHeight, dimensions, pzinstance } = this;
+      const { screenWidth, screenHeight } = dimensions;
       const { x, y, scale } = this.pzinstance.getTransform();
       const containerCoords = convert2d(follow.x, follow.y,
-        [videoWidth, videoHeight],
-        [originalWidth, originalHeight]);
+        [sourceWidth, sourceHeight],
+        [screenWidth, screenHeight]);
       const scaledContainerCoords = scaleBox(containerCoords, scale * -1);
-      const half = scaleBox([originalWidth / 2, originalHeight / 2], 1);
+      const half = scaleBox([screenWidth / 2, screenHeight / 2], 1);
       pzinstance.moveTo(scaledContainerCoords[0] + half[0], scaledContainerCoords[1] + half[1]);
     },
 
@@ -506,7 +479,7 @@ export default {
     },
 
     /**
-     * takes x, y, width, height in real video coordinates
+     * takes x, y, width, height in real source coordinates
      * draws shapes into the given context
      */
     drawShapes({ context, shapeslist, x = 0, y = 0, width, height }) {
@@ -585,46 +558,16 @@ export default {
       });
     },
 
-    videoToHiddenCanvas(x, y, width, height) {
-      const hiddenCanvas = this.$refs.hiddencanvas;
-      const hiddenCtx = hiddenCanvas.getContext('2d');
-      this.setupCanvas(hiddenCtx, width, height);
-      hiddenCtx.drawImage(this.video, x, y, width, height, 0, 0, width, height);
-      return hiddenCanvas;
-    },
+
 
     /* UI CONTROL methods */
 
-    canPlay() {
-      if (this.playing) {
-        this.video.play();
-        this.loopSetup();
-      } else {
-        this.debounceLoop();
-      }
-      const { videoWidth, videoHeight, duration } = this.video;
-      this.setWidth({ width: videoWidth });
-      this.setHeight({ height: videoHeight });
-      this.setDuration({ duration });
-      this.$emit('init');
-    },
 
-    loadImage(src) {
-      var newImg = new Image();
-      newImg.onload = () => {
-        const { width, height } = newImg;
-        this.setWidth({ width });
-        this.setHeight({ height });
-        this.setDuration({ duration: 1 / this.framerate });
-        this.$emit('init');
-      }
-      newImg.src = src;
-      this.$refs.image.src = src;
-    },
+    
 
     click(e) {
       const { offsetX, offsetY } = getPosition(e);
-      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
+      const transformed = this._convertToSourceCoordinates(offsetX, offsetY);
       this.handleEvent(frametime, 'click', { x: transformed[0], y: transformed[1] });
     },
 
@@ -638,19 +581,19 @@ export default {
       if (!this.playing) this.loop();
     },
 
-    _convertToVideoCoordinates(x1, y1) {
-      const { dimensions, videoWidth, videoHeight } = this;
+    _convertToSourceCoordinates(x1, y1) {
+      const { dimensions, sourceWidth, sourceHeight } = this;
       const { scale } = this.pzinstance.getTransform();
-      const { originalWidth, originalHeight } = dimensions;
+      const { screenWidth, screenHeight } = dimensions;
       const transformed = convert2d(x1, y1,
-        scaleBox([originalWidth, originalHeight], scale),
-        [videoWidth, videoHeight]);
+        scaleBox([screenWidth, screenHeight], scale),
+        [sourceWidth, sourceHeight]);
       return transformed;
     },
 
     mousedown(e) {
       const { offsetX, offsetY } = getPosition(e);
-      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
+      const transformed = this._convertToSourceCoordinates(offsetX, offsetY);
       const vx = transformed[0];
       const vy = transformed[1];
       this.resetMouse();
@@ -663,28 +606,43 @@ export default {
 
     async mouseup() {
       if (this.mouse.drag && this.mode === MODES.DRAG) {
-        const { down_x, down_y, last_x, last_y } = this.mouse;
-        const width = last_x - down_x;
-        const height = last_y - down_y;
-        const canvas = this.videoToHiddenCanvas(down_x, down_y, width, height);
-        this._handleEvent('dragdone', { down_x, down_y, width, height, canvas });
+        let { down_x, down_y, last_x, last_y } = this.mouse;
+        let width = last_x - down_x;
+        let height = last_y - down_y;
+        if (width < 0) {
+          down_x = down_x + width;
+          width = -1 * width;
+        }
+        if (height < 0) {
+          down_y = down_y + height;
+          height = -1 * height;
+        }
+        this._handleEvent('dragdone', { x: down_x, y: down_y, width, height });
       }
       this.mouse.drag = false;
     },
 
     async mousemove(e) {
-      const { mode, url, imgsrc, mouse } = this;
-      const { down_x, down_y } = mouse;
+      const { mode, src, mouse } = this;
+      let { down_x, down_y } = mouse;
       const { offsetX, offsetY } = getPosition(e);
-      const transformed = this._convertToVideoCoordinates(offsetX, offsetY);
+      const transformed = this._convertToSourceCoordinates(offsetX, offsetY);
       const last_x = transformed[0];
       const last_y = transformed[1];
 
       if (this.mouse.drag && mode === MODES.DRAG) {
-        const width = last_x - down_x;
-        const height = last_y - down_y;
+        let width = last_x - down_x;
+        let height = last_y - down_y;
+        if (width < 0) {
+          down_x = down_x + width;
+          width = -1 * width;
+        }
+        if (height < 0) {
+          down_y = down_y + height;
+          height = -1 * height;
+        }
         this._handleEvent('drag', { width, height, x: down_x, y: down_y });
-      } else if (mode === MODES.HANDLE && (url || imgsrc)) {
+      } else if (mode === MODES.HANDLE && (src)) {
         this._handleEvent('move', { x: last_x, y: last_y })
       }
       this.mouse.last_x = last_x;
@@ -695,30 +653,19 @@ export default {
 </script>
 
 <template lang="pug">
-.video-region
+.annotation-container
   v-btn.closebutton.ma-0(v-if="dismissable", @click="$emit('dismiss')", fab, small)
     v-icon {{ $vuetify.icons.close }}
   canvas.ma-4.hidden(ref="hiddencanvas")
   v-layout.scroll-container(
       ref="scrollcontainer",
       column, align-start, justify-center, fill-height
-      :style="{ width: `${containerWidth}px` }")
-    .video-container(ref="videocontainer")
+      :style="{ width: `${dimensions.screenWidth}px` }")
+    .canvas-container(ref="canvascontainer")
       canvas.static-canvas(ref="staticcanvas")
       canvas.canvas(ref="canvas")
-      video(
-          :crossorigin="crossorigin",
-          ref="video",
-          muted,
-          :width="url ? dimensions.width : 0",
-          :height="dimensions.height",
-          @canplay="canPlay")
-        source(:src="url", :crossorigin="crossorigin",
-            @error="$emit('error', $event)")
-        h1 Could not load video.
-      img(v-if="imgsrc", ref="image",
-          :width="dimensions.width",
-          :height="dimensions.height")
+      slot(name="source",
+          v-bind="{ width: dimensions.width, height: dimensions.height, update, src, timebusName, playing, setTimeGetter }")
 </template>
 
 <style lang="scss" scoped>
@@ -739,7 +686,7 @@ export default {
   }
 }
 
-.video-container {
+.canvas-container, .annotation-container {
   position: relative;
 }
 
