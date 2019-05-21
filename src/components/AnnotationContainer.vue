@@ -243,7 +243,6 @@ export default {
       current = null,
       follow = null,
     }) {
-      
       this.clearCanvas(this.ctx);
       if (current) {
         current_shapes = current;

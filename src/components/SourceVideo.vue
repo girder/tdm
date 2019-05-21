@@ -113,7 +113,7 @@ export default {
     },
 
     skip(direction) {
-      this.video.currentTime += direction * 5;
+      this.video.currentTime += (direction ? 1 : -1) * 5;
       this.loop();
     },
 
@@ -151,7 +151,7 @@ export default {
         if (this.timebusName === 'master') {
           this.broadcastTime(currentTime);
         }
-        this.update();
+        this.update(frametime);
       }
       if (playing && !prevent) {
         this.animationId = window.requestAnimationFrame(d => this.loop(d, false));
