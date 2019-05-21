@@ -127,13 +127,13 @@ export default {
         if (!src) {
           this.drawInfo(ctx, noSourceMessage);
         } else {
-          this.update();
+          this.update(frametime);
         }
       }
     },
 
     loading() {
-      this.update();
+      this.update(frametime);
     },
 
     mode(newval) {
@@ -180,7 +180,7 @@ export default {
     if (!this.src)
       this.drawInfo(this.ctx, this.noSourceMessage);
     else
-      this.update();
+      this.update(frametime);
   },
   methods: {
 
@@ -220,18 +220,21 @@ export default {
      */
     update(thisFrame, lastframe) {
       frametime = thisFrame;
+      lastframe = lastframe || frametime;
 
-      if (this.loading) {
-        this.clearCanvas(this.ctx);
-        this.drawInfo(this.ctx, 'LOADING...');
-      } else {
-        const { all, append, current, follow } = this.getShapes(frametime, lastframe);
-        this.processShapes({
-          all, append, current, follow, lastframe, frametime,
-          x: 0, y: 0,
-          width: this.sourceWidth,
-          height: this.sourceHeight
-        });
+      if (this.ctx && this.staticctx) {
+        if (this.loading) {
+          this.clearCanvas(this.ctx);
+          this.drawInfo(this.ctx, 'LOADING...');
+        } else {
+          const { all, append, current, follow } = this.getShapes(frametime, lastframe);
+          this.processShapes({
+            all, append, current, follow, lastframe, frametime,
+            x: 0, y: 0,
+            width: this.sourceWidth,
+            height: this.sourceHeight
+          });
+        }
       }
     },
 
@@ -494,12 +497,7 @@ export default {
       });
     },
 
-
-
     /* UI CONTROL methods */
-
-
-    
 
     click(e) {
       const { offsetX, offsetY } = getPosition(e);
@@ -513,7 +511,7 @@ export default {
         height: 0,
         drag: false
       };
-      this.update();
+      this.update(frametime);
     },
 
     _convertToSourceCoordinates(x1, y1) {

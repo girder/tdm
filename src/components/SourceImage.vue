@@ -17,6 +17,10 @@ export default {
       type: Function,
       required: true,
     },
+    crossorigin: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   watch: {
@@ -40,14 +44,14 @@ export default {
       }
       newImg.src = src;
       this.$refs.image.src = src;
-      // this.update();
+      this.update(0);
     },
   },
 }
 </script>
 
 <template lang="pug">
-img(v-if="src", ref="image",
+img(v-if="src", ref="image", :crossorigin="crossorigin",
           :width="width",
           :height="height")
 </template>
