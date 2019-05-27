@@ -4,7 +4,7 @@ v-card.tdmtemporal.pa-1.pr-3.my-0(tile)
     selection-widget.shrink.my-0(
         v-if="selectable",
         v-bind="{ events }",
-        @dropcursors="dropcursors")
+        @dropcursors="")
     .tdmtemporalGraph.grow
       time-slider(style="width: 100%", v-bind="{ timebusName, duration, offset, framerate, followers }")
       .wrapper(style="width: 100%", ref="svgcontainer")
@@ -124,7 +124,7 @@ export default {
     return {
       xbuffer: 2,
       stroke: 24,
-      time: 0,
+      frame: 0,
     };
   },
 
@@ -217,14 +217,14 @@ export default {
     },
 
     timelines() {
-      const { followers, duration, width, thresholdHeight, timebusName, time } = this;
+      const { followers, duration, width, thresholdHeight, timebusName, frame, framerate } = this;
       return [{
         name: timebusName,
-        distance: 0,
+        distance: 0, // in Frames
       }].concat(followers).map((timeline, index) => {
         const x = d3
           .scaleLinear()
-          .domain([0, duration])
+          .domain([0, Math.round(duration * framerate)])
           .range([0, width]);
         const lineFunc = d3
           .line()
@@ -232,8 +232,8 @@ export default {
           .y(d => d[1]);
         return {
           d: lineFunc([
-              [time + timeline.distance, 0],
-              [time + timeline.distance, thresholdHeight],
+              [frame + timeline.distance, 0],
+              [frame + timeline.distance, thresholdHeight],
           ]),
           stroke: '#000',
         };
@@ -269,7 +269,7 @@ export default {
   methods: {
     ...mapMutations(['setThreshold', 'setThreshBounds']),
 
-    settime(time) { this.time = time - this.offset; },
+    settime(frame) { this.frame = frame - Math.round(this.offset * this.framerate); },
 
     handleThreshClick(event) {
       const y = d3.scaleLinear()
@@ -284,27 +284,27 @@ export default {
       this.$emit('update:offset', event[0]);
     },
 
-    dropcursors(groupBy) {
-      // given a groupBy value, drop follower cursors for all series above thresh.
-      const framerate = this.framerate;
-      const events = [].concat(...this.events[groupBy]);
-      if (events.length) {
-        const firstEventBeginFrame = events[0].begin;
-        const followerEvents = events.slice(1);
-        const followers = followerEvents.map((event, i) => {
-          const name = `follower${i}`;
-          const distance = (event.begin - firstEventBeginFrame) / framerate;
-          return { name, distance };
-        });
-        this.$emit('update:followers', followers);
-        TimeBus.$emit(`${this.timebusName}:active`, (firstEventBeginFrame / framerate));
-        this.$nextTick(() => followers.forEach(follower => {
-          TimeBus.$emit(`${follower.name}:active`, (firstEventBeginFrame / framerate)  + follower.distance);
-        }));
-      } else {
-        this.$emit('update:followers', []);
-      }
-    },
+    // dropcursors(groupBy) {
+    //   // given a groupBy value, drop follower cursors for all series above thresh.
+    //   const framerate = this.framerate;
+    //   const events = [].concat(...this.events[groupBy]);
+    //   if (events.length) {
+    //     const firstEventBeginFrame = events[0].begin;
+    //     const followerEvents = events.slice(1);
+    //     const followers = followerEvents.map((event, i) => {
+    //       const name = `follower${i}`;
+    //       const distance = (event.begin - firstEventBeginFrame) / framerate;
+    //       return { name, distance };
+    //     });
+    //     this.$emit('update:followers', followers);
+    //     TimeBus.$emit(`${this.timebusName}:active`, (firstEventBeginFrame / framerate));
+    //     this.$nextTick(() => followers.forEach(follower => {
+    //       TimeBus.$emit(`${follower.name}:active`, (firstEventBeginFrame / framerate)  + follower.distance);
+    //     }));
+    //   } else {
+    //     this.$emit('update:followers', []);
+    //   }
+    // },
   },
 };
 </script>

@@ -108,8 +108,7 @@ function _findThresholdCrossings(track, threshold, thresholdKey) {
   const crossings = [];
   let pair = null;
   let looking = false; // true = looking for close.  false = looking for open.
-  for (let i = 0; i < track.detections.length; i += 1) {
-    const d = track.detections[i];
+  track.detections.forEach((d, i) => {
     const val = d.meta[thresholdKey];
     if ((val > threshold || !threshold) && !looking) {
       looking = true;
@@ -125,7 +124,7 @@ function _findThresholdCrossings(track, threshold, thresholdKey) {
         end: pair[1],
       });
     }
-  }
+  });
   return crossings;
 }
 

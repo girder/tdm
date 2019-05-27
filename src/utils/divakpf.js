@@ -8,6 +8,7 @@
 
 import yaml from 'js-yaml';
 import { STATES } from './tdm';
+import { readUploadedFileAsText } from './index';
 
 export const COLOR_BY_TYPES = ['instance', 'activity'];
 
@@ -39,33 +40,6 @@ export const ACTIVITY_COLORS = {
 
 export const GEOM_ACTOR_KEY = 'id1';
 export const TIMERANGE_KEY = 'tsr0';
-
-/**
- * @param {File} inputFile
- * @returns {Promise} stringPromise
- */
-export const readUploadedFileAsText = (inputFile, fallback) => {
-  const temporaryFileReader = new FileReader();
-  return new Promise((resolve, reject) => {
-    temporaryFileReader.onerror = (err) => {
-      console.error(err);
-      temporaryFileReader.abort();
-      reject(new DOMException('Problem parsing input file.'));
-    };
-    temporaryFileReader.onload = () => {
-      resolve(temporaryFileReader.result);
-    };
-    try {
-      temporaryFileReader.readAsText(inputFile);
-    } catch (err) {
-      if (fallback) {
-        resolve(fallback);
-      } else {
-        throw err;
-      }
-    }
-  });
-};
 
 /**
  * KPF Class parses annotations defined in KPF yaml format.

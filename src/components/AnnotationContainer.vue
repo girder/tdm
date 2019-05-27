@@ -1,12 +1,9 @@
 <script>
 import panzoom from 'panzoom';
 
-import { scaleBox } from '../utils/tdm';
-import { STATES, SHAPES, centroid } from '../utils/tdm';
+import { scaleBox, SHAPES } from '../utils/tdm';
 import { MODES } from '../constants';
-import { debounce, valBetween, convert2d, getPosition } from '../utils';
-import TimeBus from '../utils/timebus';
-import { cpus } from 'os';
+import { convert2d, getPosition } from '../utils';
 
 // Shape Cache
 let frametime = 0;
@@ -81,6 +78,10 @@ export default {
       type: String,
       default: 'Source Unavailable',
     },
+    drawAllStatic: {
+      type: Boolean,
+      default: false, // Only draw static shapes in the past by default.
+    }
   },
   data() {
     return {
@@ -117,7 +118,6 @@ export default {
   },
 
   watch: {
-    
     dimensions() {
       const { ctx, staticctx, dimensions, src, noSourceMessage } = this;
       if (ctx && staticctx) {
@@ -137,7 +137,7 @@ export default {
     },
 
     mode(newval) {
-      if (newval === MODES.DRAG) {
+      if (newval === MODES.DRAG || newval === MODES.HANDLE) {
         this.pzinstance.pause();
       } else {
         this.pzinstance.resume();
@@ -169,7 +169,7 @@ export default {
       minZoom: 1,
       smoothScroll: false
     });
-    if (this.mode === MODES.DRAG) {
+    if (this.mode === MODES.DRAG || this.mode === MODES.HANDLE) {
       this.pzinstance.pause();
     }
     this.$refs.canvas.addEventListener('click', this.click, false);
@@ -219,8 +219,8 @@ export default {
      * with prevent=false.
      */
     update(thisFrame, lastframe) {
-      frametime = thisFrame;
       lastframe = lastframe || frametime;
+      frametime = thisFrame;
 
       if (this.ctx && this.staticctx) {
         if (this.loading) {
@@ -247,6 +247,12 @@ export default {
       follow = null,
     }) {
       this.clearCanvas(this.ctx);
+
+      if (!this.src) {
+        this.drawInfo(this.ctx, this.noSourceMessage);
+        return;
+      }
+
       if (current) {
         current_shapes = current;
         this.drawShapes({
@@ -264,21 +270,27 @@ export default {
       if (all) {
         static_shapes = all;
         this.clearCanvas(this.staticctx);
+        let shapeslist = [];
+        if (this.drawAllStatic) {
+          shapeslist = static_shapes;
+        } else {
+          shapeslist = static_shapes.slice(0, frametime);
+        }
         this.drawShapes({
           context: this.staticctx,
-          shapeslist: static_shapes.slice(0, frametime),
+          shapeslist,
           x, y, width, height,
         });
-      } else if (lastframe < frametime) {
+      } else if (lastframe < frametime && !this.drawAllStatic) {
         append.forEach((shapes, index) => {
           static_shapes[index] = shapes;
         });
+        const shapeslist = static_shapes.slice(lastframe, frametime);
         this.drawShapes({
-          context: this.staticctx,
-          shapeslist: static_shapes.slice(lastframe, frametime),
+          context: this.staticctx, shapeslist,
           x, y, width, height,
         });
-      } else if (lastframe > frametime) {
+      } else if (lastframe > frametime && !this.drawAllStatic) {
         this.clearCanvas(this.staticctx);
         this.drawShapes({
           context: this.staticctx,

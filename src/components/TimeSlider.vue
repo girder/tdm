@@ -19,38 +19,56 @@ export default {
       type: Number,
       default: 30,
     },
+    stepsize: {
+      type: Number, // Frames
+      default: 30
+    },
     /* Array<{
      *   name: String, // name of the follower bus.
      *   distance: Number // scalar distance from master.
      * }>
      */
-    followers: {
-      type: Array,
-      default: () => [],
-    },
+    // followers: {
+    //   type: Array,
+    //   default: () => [],
+    // },
   },
+
   data() {
     return {
-      time: 0, // in seconds
+      frame: 0, // in frames
     };
   },
+
   mounted() {
-    TimeBus.$on(`${this.timebusName}:passive`, time => (this.time = time));
+    TimeBus.$on(`${this.timebusName}:passive`, this.setTime);
   },
+
+  beforeDestroy() {
+    TimeBus.$off(`${this.timebusName}:passive`, this.setTime);
+  },
+
   computed: {
-    step() {
-      return 1 / this.framerate;
+    frameduration() {
+      return Math.round(this.duration * this.framerate);
+    },
+    frameoffset() {
+      return Math.round(this.offset * this.framerate);
     },
   },
+
   methods: {
+    setTime(frame) {
+      this.frame = frame;
+    },
+
     progressChangeInput(e) {
-      const value = parseFloat(e.target.value);
-      const fixed = parseFloat(value.toFixed(3));
-      TimeBus.$emit(`${this.timebusName}:active`, fixed + this.offset);
+      const value = Math.round(parseFloat(e.target.value)); // Frames
+      TimeBus.$emit(`${this.timebusName}:active`,value + this.frameoffset);
       // Emit follower updates
-      this.followers.forEach(follower => {
-        TimeBus.$emit(`${follower.name}:active`, fixed + this.offset + follower.distance);
-      });
+      // this.followers.forEach(follower => {
+      //   TimeBus.$emit(`${follower.name}:active`, value + this.frameoffset + follower.distance);
+      // });
     },
   },
 };
@@ -58,8 +76,8 @@ export default {
 
 <template lang="pug">
 input.slider.py-0(type="range",
-    :value="time - offset",
-    :max="duration",
-    :step="step",
+    :value="frame - frameoffset",
+    :max="frameduration",
+    :step="stepsize",
     @input="progressChangeInput")
 </template>

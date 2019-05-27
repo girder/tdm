@@ -1,4 +1,5 @@
 <script>
+import { debounce } from '../utils';
 import TimeBus from '../utils/timebus';
 
 let frametime = 0;
@@ -60,6 +61,7 @@ export default {
     return {
       video: null,
       animationId: null,
+      debounceLoop: () => {},
     };
   },
 
@@ -98,22 +100,23 @@ export default {
 
   mounted() {
     this.video = this.$refs.video;
+    this.debounceLoop = debounce(this.loop, 2000);
     TimeBus.$on(`${this.timebusName}:active`, this.setCurrentTime);
     TimeBus.$on(`${this.timebusName}:skip`, this.skip);
   },
 
   methods: {
     broadcastTime(time) {
-      TimeBus.$emit(`${this.timebusName}:passive`, time);
+      TimeBus.$emit(`${this.timebusName}:passive`, Math.round(time * this.framerate));
     },
   
-    setCurrentTime(time) {
-      this.video.currentTime = time;
+    setCurrentTime(frame) {
+      this.video.currentTime = parseFloat((frame / this.framerate).toFixed(3));
       this.loop();
     },
 
-    skip(direction) {
-      this.video.currentTime += (direction ? 1 : -1) * 5;
+    skip(frameamount) {
+      this.video.currentTime += parseFloat((frameamount / this.framerate).toFixed(3));
       this.loop();
     },
 

@@ -4,17 +4,19 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 
-import { eventsForThreshold, STATES } from '../utils/tdm';
+import { binarySearch } from '../utils';
+import { eventsForThreshold, STATES, interpolateFrames } from '../utils/tdm';
 import { CONTRAST_COLORS, SEQUENCE_COLORS, DISABLED_COLOR } from '../constants';
+import { restProperty } from 'babel-types';
 
 Vue.use(Vuex);
 
 const state = {
   /* TDM State */
-  tracks: [], // Array<Track>
+  // tracks: [], // Array<Track>
   statemap: {}, // Object<String, TrackState> map of metadata value to state
   colormap: {}, // Object<String, Color> map of metadata value to color
-  cache: {}, // Object<String, Array<Track>> reverse map of metadata value to tracks with that value
+  // cache: {}, // Object<String, Array<Track>> reverse map of metadata value to tracks with that value
   colorBy: '', // String metadata category to color by
   preselect: '', // String metadata value.
   notifier: { notify: () => {} },
@@ -36,12 +38,19 @@ const state = {
   /* Threshold and derived properties */
   threshold: null, // threshold disabled by default
   thresholdKey: 'confidence',
-  thresholdedEvents: {}, // Array<Array<Event>>
+  // thresholdedEvents: {}, // Array<Array<Event>>
   thresholdMin: 0,
   thresholdMax: 1,
+
+  /* Canary variables for non-reactive props */
+  tracksCanary: 0,
+  cacheCanary: 0,
+  thresholdedEventsCanary: 0,
 };
 
 const getters = {
+
+  getTrack: state => key => state.tracks.find(t => t.key === key),
 
   activeContinuousFrames: state => (startframe, endframe) => {
     let start = Math.round(startframe);
@@ -54,35 +63,54 @@ const getters = {
       return [];
     }
     return state.tracks
-      .filter(trackinfo => !trackinfo.interpolated)
+      // .filter(trackinfo => !trackinfo.interpolated)
       .filter(track => track.begin <= start)
-      .map(track => ({
-        track,
-        detections: track.detections.slice(start - track.begin, end - track.begin),
-      }));
+      .map((track) => {
+        let starti = binarySearch(track.detections, { frame: start }, (a, b) => a.frame - b.frame);
+        if (starti < 0) {
+          starti = Math.abs((starti + 1) * -1);
+        }
+        const ret = [];
+        if (starti > 0 && starti < track.detections.length) {
+          ret.push(interpolateFrames(
+            start,
+            track.detections[starti - 1],
+            track.detections[starti],
+          ));
+        } else if (starti === 0) {
+          ret.push(track.detections[starti]);
+        } else {
+          ret.push(track.detections[starti - 1]);
+        }
+        let detection = track.detections[starti];
+        while (detection && detection.frame <= end) {
+          ret.push(detection);
+          starti += 1;
+          detection = track.detections[starti];
+        }
+        if (detection && detection.frame > end) {
+          ret.push(interpolateFrames(
+            end,
+            track.detections[starti - 1],
+            track.detections[starti],
+          ));
+        }
+        return {
+          track,
+          detections: ret,
+        };
+      });
   },
-
-  // TODO: fix interpolation
-  // activeKeyFrames: state => (frametime) => {
-  //   const frames = state.tracks
-  //     .filter(trackinfo => trackinfo.interpolated)
-  //     .map((trackinfo) => {
-  //       const track = trackinfo.detections;
-  //       for (let i = 0; i < track.length - 1; i += 1) {
-  //         const d0 = track[i];
-  //         const d1 = track[i + 1];
-  //         if (frametime >= d0.frame && frametime <= d1.frame) {
-  //           return interpolateFrames(frametime, d0, d1);
-  //         }
-  //       }
-  //       return null;
-  //     })
-  //     .filter(track => track !== null);
-  //   return frames;
-  // },
 };
 
 const mutations = {
+  init() {
+    // Initialize non-reactive properties
+    state.tracks = [];
+    state.cache = {};
+    state.thresholdedEvents = {};
+  },
+
   colorByMeta(state, { key }) {
     const assignedColors = {};
     const cache = {};
@@ -99,7 +127,9 @@ const mutations = {
       }
     });
     state.cache = cache;
+    state.cacheCanary += 1;
     state.thresholdedEvents = eventsForThreshold(cache, state.threshold, state.thresholdKey);
+    state.thresholdedEventsCanary += 1;
     state.colormap = assignedColors;
     state.colorBy = key;
   },
@@ -138,23 +168,35 @@ const mutations = {
       track.detections = track.detections.sort((a, b) => a.frame - b.frame);
     });
     state.tracks = tracks;
+    state.tracksCanary += 1;
   },
 
   removeTrack(state, { key }) {
     state.tracks = state.tracks.filter(t => t.key !== key);
+    state.tracksCanary += 1;
   },
 
   editTrack(state, { track }) {
     const index = state.tracks.findIndex(t => t.key === track.key);
     if (index >= 0) {
-      Vue.set(state.tracks, index, track);
+      state.tracks[index] = track;
+      state.tracksCanary += 1;
     }
   },
 
   setDetection(state, { trackKey, frame, detection }) {
+    window.binsearch = binarySearch;
     const track = state.tracks.find(t => t.key === trackKey);
     if (track) {
-      Vue.set(track.detections, frame - track.begin, detection);
+      const position = binarySearch(track.detections, { frame }, (a, b) => a.frame - b.frame);
+      if (position >= 0) {
+        track.detections[position] = detection;
+        // Vue.set(track.detections, position, detection);
+      } else {
+        track.detections.splice((position * -1) - 1, 0, detection);
+      }
+    } else {
+      throw new Error(`Track ${trackKey} not found`);
     }
   },
 

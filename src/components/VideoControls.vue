@@ -39,6 +39,14 @@ export default {
       type: String,
       default: 'master',
     },
+    skipAmount: {
+      type: Number,
+      default: 30, // in FRAMES
+    },
+    framerate: {
+      type: Number,
+      required: true
+    },
   },
 
   components: { TimeStamp },
@@ -69,8 +77,8 @@ export default {
       });
     },
 
-    skip(direction) {
-      TimeBus.$emit(`${this.timebusName}:skip`, direction);
+    skip(amount) {
+      TimeBus.$emit(`${this.timebusName}:skip`, amount);
     },
   },
 };
@@ -80,14 +88,14 @@ export default {
 v-toolbar.video-controls(shift, dense)
   v-layout(row, align-center, wrap)
     v-flex(shrink)
-      v-btn(icon, @click="skip(false)")
+      v-btn(icon, @click="skip(skipAmount * -1)")
         v-icon {{ $vuetify.icons.skipPrevious }}
       v-btn(icon, @click="$emit('update:playing', !playing )")
         v-icon(v-show="playing") {{ $vuetify.icons.pause }}
         v-icon(v-show="!playing") {{ $vuetify.icons.play }}
-      v-btn(icon, @click="skip(true)")
+      v-btn(icon, @click="skip(skipAmount)")
         v-icon {{ $vuetify.icons.skipNext }}
-      time-stamp(v-bind="{ duration, offset, timebusName }")
+      time-stamp(v-bind="{ duration, offset, timebusName, framerate }")
     v-flex.shrink
       v-select.px-2(
           @change="$emit('update:playbackRate', $event )",
