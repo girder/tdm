@@ -88,6 +88,7 @@ export default {
       ctx: null,
       staticctx: null,
       pzinstance: null,
+      belayEvent: false,
       mouse: {
         down_x: 0,
         down_y: 0,
@@ -166,8 +167,12 @@ export default {
     // this.resetMouse();
     this.pzinstance = panzoom(this.$refs.canvascontainer, {
       maxZoom: 6,
-      minZoom: 1,
+      minZoom: 0.7,
       smoothScroll: false
+    });
+    // Belay click and other events during a pan
+    this.pzinstance.on('pan', () => {
+      this.belayEvent = true;
     });
     if (this.mode === MODES.DRAG || this.mode === MODES.HANDLE) {
       this.pzinstance.pause();
@@ -214,6 +219,11 @@ export default {
       });
     },
 
+    resetZoom() {
+      this.pzinstance.zoomAbs(0, 0, 0.95);
+      this.pzinstance.moveTo(0, 0);
+    },
+
     /**
      * This function should be used to guarantee that loop is invoked
      * with prevent=false.
@@ -229,7 +239,8 @@ export default {
         } else {
           const { all, append, current, follow } = this.getShapes(frametime, lastframe);
           this.processShapes({
-            all, append, current, follow, lastframe, frametime,
+            all, append, current, follow,
+            lastframe, frametime,
             x: 0, y: 0,
             width: this.sourceWidth,
             height: this.sourceHeight
@@ -514,7 +525,8 @@ export default {
     click(e) {
       const { offsetX, offsetY } = getPosition(e);
       const transformed = this._convertToSourceCoordinates(offsetX, offsetY);
-      this.handleEvent(frametime, 'click', { x: transformed[0], y: transformed[1] });
+      this._handleEvent('click', { x: transformed[0], y: transformed[1], belay: this.belayEvent })
+      this.belayEvent = false;
     },
 
     resetMouse() {
