@@ -25,8 +25,8 @@ const state = {
   width: 1920,
   height: 1080,
   framerate: 30,
-  duration: 300, // seconds
-  originalDuration: 300, // seconds
+  duration: 9000, // frames
+  originalDuration: 9000, // frames
   offset: 0, // seconds
   /* Control state */
   playbackRate: 1,

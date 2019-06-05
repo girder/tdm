@@ -125,7 +125,7 @@ export default {
       } else if (newTime < offset) {
         this.video.currentTime = offset / this.framerate;
       } else {
-        this.video.currentTime = duration / this.framerate;
+        this.video.currentTime = (duration + offset) / this.framerate;
       }
       this.loop();
     },
@@ -156,7 +156,7 @@ export default {
           && thisFrame > (offset + duration)
           && timebusName === 'master') {
         this.$emit('update:playing', false);
-        TimeBus.$emit(`${this.timebusName}:active`, duration);
+        TimeBus.$emit(`${this.timebusName}:active`, offset + duration);
       } else if ((thisFrame !== lastframe) || prevent) {
         frametime = thisFrame;
         // Only emit passive events to the master timebus

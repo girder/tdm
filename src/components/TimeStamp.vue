@@ -50,8 +50,8 @@ export default {
     },
   },
   computed: {
-    now() { return this.toTimeStamp(this.frame - this.offset) },
-    end() { return this.toTimeStamp(this.offset + this.duration) },
+    now() { return this.toTimeStamp(this.frame) },
+    end() { return this.toTimeStamp(this.duration + this.offset) },
   },
 }
 </script>
