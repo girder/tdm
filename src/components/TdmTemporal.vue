@@ -6,7 +6,7 @@ v-card.tdmtemporal.pa-1.pr-3.my-0(tile)
         v-bind="{ events }",
         @dropcursors="")
     .tdmtemporalGraph.grow
-      time-slider(style="width: 100%", v-bind="{ timebusName, duration, offset, framerate, followers }")
+      time-slider(style="width: 100%", v-bind="{ timebusName, duration, offset, followers }")
       .wrapper(style="width: 100%", ref="svgcontainer")
         svg(@mousemove="", :width="width", :height="height", ref="barsvg")
           g(v-for="group in groups", :style="{ transform: `translate(0px, ${group.top}px)`}")
@@ -85,10 +85,6 @@ export default {
       type: Number,
       required: true,
     },
-    framerate: {
-      type: Number,
-      default: 30,
-    },
     threshold: {
       validator: prop => typeof prop === 'number' || prop === null,
       required: true,
@@ -159,10 +155,10 @@ export default {
     },
 
     groups() {
-      const { offset, framerate, duration, events, xbuffer, width, stroke, colorBy, colormap } = this;
+      const { offset, duration, events, xbuffer, width, stroke, colorBy, colormap } = this;
       const x = d3
         .scaleLinear()
-        .domain([offset * framerate, (offset + duration) * framerate])
+        .domain([offset, (offset + duration)])
         .range([0, width]);
       const lineFunction = d3
         .line()
@@ -183,7 +179,7 @@ export default {
         })));
         // Add background grey
         paths.push({
-          d: lineFunction([offset * framerate + 0.001, (offset + duration) * framerate]),
+          d: lineFunction([offset, (offset + duration)]),
           stroke: '#ccc',
           opacity: 0.2,
         });
@@ -197,11 +193,11 @@ export default {
 
     threshPaths() {
       const {
-        offset, framerate, duration, width,
+        offset, duration, width,
         thresholdHeight, thresholdMin, thresholdMax,
         statemap, colorBy, thresholdTracks } = this;
       const x = d3.scaleLinear()
-        .domain([offset * framerate, (offset + duration) * framerate])
+        .domain([offset, (offset + duration)])
         .range([0, width]);
       const y = d3.scaleLinear()
         .domain([thresholdMin, thresholdMax])
@@ -217,14 +213,14 @@ export default {
     },
 
     timelines() {
-      const { followers, duration, width, thresholdHeight, timebusName, frame, framerate } = this;
+      const { followers, duration, width, thresholdHeight, timebusName, frame } = this;
       return [{
         name: timebusName,
         distance: 0, // in Frames
       }].concat(followers).map((timeline, index) => {
         const x = d3
           .scaleLinear()
-          .domain([0, Math.round(duration * framerate)])
+          .domain([0, Math.round(duration)])
           .range([0, width]);
         const lineFunc = d3
           .line()
@@ -269,7 +265,7 @@ export default {
   methods: {
     ...mapMutations(['setThreshold', 'setThreshBounds']),
 
-    settime(frame) { this.frame = frame - Math.round(this.offset * this.framerate); },
+    settime(frame) { this.frame = frame - Math.round(this.offset); },
 
     handleThreshClick(event) {
       const y = d3.scaleLinear()

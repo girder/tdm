@@ -219,9 +219,17 @@ export default {
       });
     },
 
-    resetZoom() {
-      this.pzinstance.zoomAbs(0, 0, 0.95);
-      this.pzinstance.moveTo(0, 0);
+    resetZoom(x = 0, y = 0, zoom = 0.95) {
+      this.pzinstance.zoomAbs(0, 0, zoom);
+      if (x || y) {
+        const { sourceWidth, sourceHeight, dimensions } = this;
+        const { screenWidth, screenHeight } = dimensions;
+        const scale = (screenWidth*zoom) / sourceWidth;
+        x = ((-1 * x) + (sourceWidth/(2*zoom))) * scale;
+        y = ((-1 * y) + sourceHeight/(2*zoom)) * scale;
+      }
+      this.pzinstance.moveTo(x, y);
+      this.belayEvent = false;
     },
 
     /**
@@ -258,7 +266,6 @@ export default {
       follow = null,
     }) {
       this.clearCanvas(this.ctx);
-
       if (!this.src) {
         this.drawInfo(this.ctx, this.noSourceMessage);
         return;

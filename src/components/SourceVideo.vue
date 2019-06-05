@@ -106,17 +106,27 @@ export default {
   },
 
   methods: {
-    broadcastTime(time) {
-      TimeBus.$emit(`${this.timebusName}:passive`, Math.round(time * this.framerate));
+    broadcastTime(frame) {
+      TimeBus.$emit(`${this.timebusName}:passive`, frame);
     },
   
     setCurrentTime(frame) {
-      this.video.currentTime = parseFloat((frame / this.framerate).toFixed(3));
+      this.video.currentTime = parseFloat((frame / this.framerate).toFixed(6));
       this.loop();
     },
 
     skip(frameamount) {
-      this.video.currentTime += parseFloat((frameamount / this.framerate).toFixed(3));
+      const { offset, duration } = this;
+      const frametime = Math.round(this.video.currentTime * this.framerate);
+      const delta = Math.round(frameamount);
+      const newTime = frametime + delta; // integer frame
+      if (newTime <= (offset + duration) && newTime >= offset) {
+        this.video.currentTime = newTime / this.framerate;
+      } else if (newTime < offset) {
+        this.video.currentTime = offset / this.framerate;
+      } else {
+        this.video.currentTime = duration / this.framerate;
+      }
       this.loop();
     },
 
@@ -138,21 +148,20 @@ export default {
       }
       const { offset, duration, framerate, timebusName, playing } = this.$props;
       const lastframe = frametime;
-      const currentTime = this.video.currentTime;
-      const thisFrame = Math.round(currentTime * framerate);
+      const thisFrame = Math.round(this.video.currentTime * this.framerate);
       // TODO: this logic can probably be simplified.
-      if (currentTime < offset && timebusName === 'master') {
-        TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
+      if (thisFrame < offset && timebusName === 'master') {
+        TimeBus.$emit(`${this.timebusName}:active`, offset);
       } else if (!prevent
-        && currentTime > (offset + duration)
-        && timebusName === 'master') {
-        // reset clock to offset
-        TimeBus.$emit(`${this.timebusName}:active`, offset + 0.001);
+          && thisFrame > (offset + duration)
+          && timebusName === 'master') {
+        this.$emit('update:playing', false);
+        TimeBus.$emit(`${this.timebusName}:active`, duration);
       } else if ((thisFrame !== lastframe) || prevent) {
         frametime = thisFrame;
         // Only emit passive events to the master timebus
         if (this.timebusName === 'master') {
-          this.broadcastTime(currentTime);
+          this.broadcastTime(frametime);
         }
         this.update(frametime);
       }

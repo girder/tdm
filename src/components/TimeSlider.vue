@@ -8,16 +8,12 @@ export default {
       default: 'master',
     },
     duration: {
-      type: Number, // Seconds
+      type: Number, // Frames
       required: true,
     },
     offset: {
-      type: Number, // Seconds
+      type: Number, // Frames
       default: 0,
-    },
-    framerate: {
-      type: Number,
-      default: 30,
     },
     stepsize: {
       type: Number, // Frames
@@ -48,15 +44,6 @@ export default {
     TimeBus.$off(`${this.timebusName}:passive`, this.setTime);
   },
 
-  computed: {
-    frameduration() {
-      return Math.round(this.duration * this.framerate);
-    },
-    frameoffset() {
-      return Math.round(this.offset * this.framerate);
-    },
-  },
-
   methods: {
     setTime(frame) {
       this.frame = frame;
@@ -64,11 +51,7 @@ export default {
 
     progressChangeInput(e) {
       const value = Math.round(parseFloat(e.target.value)); // Frames
-      TimeBus.$emit(`${this.timebusName}:active`,value + this.frameoffset);
-      // Emit follower updates
-      // this.followers.forEach(follower => {
-      //   TimeBus.$emit(`${follower.name}:active`, value + this.frameoffset + follower.distance);
-      // });
+      TimeBus.$emit(`${this.timebusName}:active`, value + this.offset);
     },
   },
 };
@@ -76,8 +59,8 @@ export default {
 
 <template lang="pug">
 input.slider.py-0(type="range",
-    :value="frame - frameoffset",
-    :max="frameduration",
+    :value="frame - offset",
+    :max="duration",
     :step="stepsize",
     @input="progressChangeInput")
 </template>

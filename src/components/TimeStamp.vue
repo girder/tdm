@@ -12,11 +12,11 @@ export default {
       default: 'master',
     },
     offset: {
-      type: Number, // Seconds
+      type: Number, // Frames
       default: 0,
     },
     duration: {
-      type: Number, // Seconds
+      type: Number, // Frames
       required: true,
     },
     framerate: {
@@ -50,8 +50,8 @@ export default {
     },
   },
   computed: {
-    now() { return this.toTimeStamp(this.frame) },
-    end() { return this.toTimeStamp((this.offset + this.duration) * this.framerate) },
+    now() { return this.toTimeStamp(this.frame - this.offset) },
+    end() { return this.toTimeStamp(this.offset + this.duration) },
   },
 }
 </script>

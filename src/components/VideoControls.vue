@@ -12,16 +12,20 @@ export default {
       required: true,
     },
     duration: {
-      type: Number, // Seconds
+      type: Number, // Frames
       required: true,
     },
     offset: {
-      type: Number, // Seconds
+      type: Number, // Frames
       default: 0,
     },
     playing: {
       type: Boolean,
       required: true,
+    },
+    playpause: {
+      type: Boolean,
+      default: true,
     },
     playbackRate: {
       type: Number,
@@ -90,7 +94,7 @@ v-toolbar.video-controls(shift, dense)
     v-flex(shrink)
       v-btn(icon, @click="skip(skipAmount * -1)")
         v-icon {{ $vuetify.icons.skipPrevious }}
-      v-btn(icon, @click="$emit('update:playing', !playing )")
+      v-btn(:disabled="!playpause", icon, @click="$emit('update:playing', !playing )")
         v-icon(v-show="playing") {{ $vuetify.icons.pause }}
         v-icon(v-show="!playing") {{ $vuetify.icons.play }}
       v-btn(icon, @click="skip(skipAmount)")
