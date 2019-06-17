@@ -7,7 +7,6 @@ import Vuex from 'vuex';
 import { binarySearch } from '../utils';
 import { eventsForThreshold, STATES, interpolateFrames } from '../utils/tdm';
 import { CONTRAST_COLORS, SEQUENCE_COLORS, DISABLED_COLOR } from '../constants';
-import { restProperty } from 'babel-types';
 
 Vue.use(Vuex);
 
@@ -16,7 +15,8 @@ const state = {
   // tracks: [], // Array<Track>
   statemap: {}, // Object<String, TrackState> map of metadata value to state
   colormap: {}, // Object<String, Color> map of metadata value to color
-  // cache: {}, // Object<String, Array<Track>> reverse map of metadata value to tracks with that value
+  // cache: {}, // Object<String, Array<Track>> reverse
+  // map of metadata value to tracks with that value
   colorBy: '', // String metadata category to color by
   preselect: '', // String metadata value.
   notifier: { notify: () => {} },
@@ -184,15 +184,18 @@ const mutations = {
     }
   },
 
-  setDetection(state, { trackKey, frame, detection }) {
-    window.binsearch = binarySearch;
+  setDetection(state, { trackKey, frame, detection, remove = false }) {
     const track = state.tracks.find(t => t.key === trackKey);
     if (track) {
       const position = binarySearch(track.detections, { frame }, (a, b) => a.frame - b.frame);
       if (position >= 0) {
-        track.detections[position] = detection;
+        if (remove) {
+          track.detections.splice(position, 1);
+        } else {
+          track.detections[position] = detection;
+        }
         // Vue.set(track.detections, position, detection);
-      } else {
+      } else if (!remove) {
         track.detections.splice((position * -1) - 1, 0, detection);
       }
     } else {
