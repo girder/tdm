@@ -237,7 +237,7 @@ export default {
      * with prevent=false.
      */
     update(thisFrame, lastframe) {
-      lastframe = lastframe || frametime;
+      lastframe = lastframe || (frametime - 1);
       frametime = thisFrame;
 
       if (this.ctx && this.staticctx) {

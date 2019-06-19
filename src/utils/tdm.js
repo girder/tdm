@@ -142,12 +142,17 @@ function interpolateFrames(currentFrame, d0, d1) {
   // a + b = 1; interpolate from a to b
   const b = Math.abs((currentFrame - d0.frame) / len);
   const a = 1 - b;
+  let interpolated = true;
+  if (b === 0 || a === 0) {
+    interpolated = false; // actually this is a keyframe
+  }
   let box;
   if (d0.box) {
     box = d0.box.map((_, i) => ((d0.box[i] * a) + (d1.box[i] * b)));
   }
+  const meta = { ...d0.meta, interpolated };
   const frame = Math.round((d0.frame * a) + (d1.frame * b));
-  return { ...d0, frame, box };
+  return { ...d0, meta, frame, box };
 }
 
 /**
