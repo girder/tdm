@@ -376,7 +376,7 @@ export default {
       ctx.strokeStyle = outlineColor;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(Math.round(x), Math.round(y), Math.round(radius * CANVAS_SCALAR), 0, 2 * Math.PI);
+      ctx.arc(Math.round(x), Math.round(y), Math.round(radius), 0, 2 * Math.PI);
       ctx.stroke();
       ctx.fill();
       ctx.globalAlpha = 1.0;
@@ -387,7 +387,7 @@ export default {
      */
     drawLine(context, a, b, width, color) {
       const ctx = context;
-      ctx.lineWidth = Math.round(width * CANVAS_SCALAR);
+      ctx.lineWidth = Math.round(width);
       ctx.globalAlpha = 0.8;
       ctx.strokeStyle = color;
       ctx.beginPath();
