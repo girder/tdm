@@ -36,38 +36,6 @@ export const STATES = {
 };
 
 /**
- * @typedef {number} ShapeType
- */
-
-/**
- * Enum for shape types
- * @readonly
- * @enum {ShapeType}
- */
-export const SHAPES = {
-  POINT: 1, // data: point, radius, width
-  LINE: 2, // data: a: [x, y], b: [x, y], width
-  BOX: 3, // data: box: Detection.box, width
-  REGION: 4, // data: box: Detection.box, opacity
-  IMAGE: 5, // data: url, x, y
-  LABEL: 6, // data: text, bgcolor, textcolor
-};
-
-/**
- * Meta Schema; can have any properties.
- * @typedef {Obect} Metadata
- */
-
-/**
- * Shape Schema; shapes describe a drawable annotation
- * @typedef {Object} Shape
- * @property {Object} data
- * @property {ShapeType} type
- * @property {String} color
- * @property {Object} meta
- */
-
-/**
  * Event Schema; an event is a range within a track
  * @typedef {Object} Event
  * @param {Track} track reference to the parent track
@@ -188,23 +156,6 @@ function centroid(box, x = 0.5, y = 0.5) {
 }
 
 /**
- * Generate a list of centroids for a given track.
- * @param {Array<Detection>} detections
- * @returns {Array<Shape>}
- */
-function generateCentroids(detections, color, radius = 6) {
-  return detections.map(d => ({
-    type: SHAPES.POINT,
-    color,
-    data: {
-      width: 1,
-      point: centroid(d.box),
-      radius, // unitless scalar
-    },
-  }));
-}
-
-/**
  * Return a list of events for tracks with detections > threshold
  * @param {Object<string, Array<Track>>} groups the groups to threshold
  * @param {Number} threshold scalar comparator
@@ -225,53 +176,6 @@ function eventsForThreshold(groups, threshold, thresholdKey) {
 }
 
 /**
- * Determine if x, y are inside shape
- */
-function intersect({ x, y }, shape) {
-  switch (shape.type) {
-    case SHAPES.POINT: {
-      const { point, radius } = shape.data;
-      if (point[0] - radius < x
-        && (x < point[0] + radius)
-        && point[1] - radius < y
-        && y < point[1] + radius) {
-        return true;
-      }
-      break;
-    }
-    default: {
-      return false;
-    }
-  }
-  return false;
-}
-
-/**
- * @param {Array<Detection>} detections
- * @param {Function<Detection>:String} colorfunc
- * @returns {Array<Array<Shape>>} where outer array is keyed by frame #
- */
-function generateDetectionLines(detections, colorfunc, width = 2, x = 0.5, y = 0.5) {
-  const lines = [];
-  let last = null;
-  detections.forEach((detection, frame) => {
-    if (last) {
-      lines[last.frame] = [{
-        type: SHAPES.LINE,
-        color: colorfunc(last),
-        data: {
-          width,
-          a: centroid(last.box, x, y),
-          b: centroid(detection.box, x, y),
-        },
-      }];
-    }
-    last = detection;
-  });
-  return lines;
-}
-
-/**
  * Merge thinglists from b into a
  */
 function mergeFrameArrays(a, b) {
@@ -289,10 +193,7 @@ export {
   centroid,
   eventsForThreshold,
   filterByMeta,
-  generateCentroids,
-  generateDetectionLines,
   interpolateFrames,
-  intersect,
   mergeFrameArrays,
   scaleBox,
 };

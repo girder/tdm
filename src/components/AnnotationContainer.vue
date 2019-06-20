@@ -13,7 +13,6 @@ let follow_shape = null;
 
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 1;
-
 const CANVAS_SCALAR = 2;
  
 export default {
@@ -366,53 +365,6 @@ export default {
       );
     },
 
-    /**
-     * takes x, y in screen coordinates.
-     */
-    drawDot(context, x, y, radius, color, width, outlineColor = 'black') {
-      const ctx = context;
-      ctx.lineWidth = width;
-      ctx.globalAlpha = 0.7;
-      ctx.strokeStyle = outlineColor;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(Math.round(x), Math.round(y), Math.round(radius * CANVAS_SCALAR), 0, 2 * Math.PI);
-      ctx.stroke();
-      ctx.fill();
-      ctx.globalAlpha = 1.0;
-    },
-
-    /**
-     * takes a, b, in screen coordinates
-     */
-    drawLine(context, a, b, width, color) {
-      const ctx = context;
-      ctx.lineWidth = Math.round(width * CANVAS_SCALAR);
-      ctx.globalAlpha = 0.8;
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(a[0]), Math.round(a[1]));
-      ctx.lineTo(Math.round(b[0]), Math.round(b[1]));
-      ctx.stroke();
-      ctx.globalAlpha = 1.0;
-    },
-
-    /**
-     * draw an outline box
-     */
-    drawBox(context, x, y, width, height, lineWidth, color) {
-      const ctx = context;
-      ctx.lineWidth = lineWidth;
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.rect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
-      ctx.stroke();
-    },
-
-    drawRegion(context, x, y, width, height, color, opacity) {
-      // TODO
-    },
-
     drawStamp(context, frame) {
       // TODO: review
       const { x, y } = this.pzinstance.getTransform();
@@ -428,25 +380,6 @@ export default {
       ctx.fillText(frameText, 4, 26);
     },
 
-    drawImage(context, x, y, src) {
-      // TODO
-    },
-
-    drawLabel(context, x, y, text, bgcolor, textcolor) {
-      // TODO: review
-      ctx.font = '28px mono';
-      ctx.fillStyle = bgcolor;
-      ctx.strokeStyle = textcolor;
-      const textWidth = ctx.measureText(text).width;
-      ctx.fillRect(
-        Math.round(x - 2),
-        Math.round(y - 2),
-        Math.round(textWidth) + 4,
-        14
-      );
-      ctx.fillText(text, Math.floor(x), Math.floor(y));
-    },
-
     /**
      * takes x, y, width, height in real source coordinates
      * draws shapes into the given context
@@ -454,77 +387,13 @@ export default {
     drawShapes({ context, shapeslist, x = 0, y = 0, width, height }) {
       const ctx = context;
       const scale = ctx.canvas.width / width;
-      const scalex = scale * x;
-      const scaley = scale * y;
-      // height scale == width scale to maintain aspect ratio
+      context.save()
+      context.scale(scale, scale);
+      context.translate(x, y);
       shapeslist.forEach((shapes, frame) => {
-        shapes.forEach(shape => {
-          const { type: shapeType, color, data } = shape;
-          let a, b, p, r;
-
-          switch (shapeType) {
-            case SHAPES.POINT:
-              p = scaleBox(data.point, scale);
-              this.drawDot(
-                ctx,
-                p[0] - scalex,
-                p[1] - scaley,
-                data.radius,
-                color,
-                data.width,
-                data.outlineColor,
-              );
-              break;
-
-            case SHAPES.LINE:
-              a = scaleBox(data.a, scale);
-              b = scaleBox(data.b, scale);
-              this.drawLine(
-                ctx,
-                [a[0] - scalex, a[1] - scaley],
-                [b[0] - scalex, b[1] - scaley],
-                data.width,
-                color
-              );
-              break;
-
-            case SHAPES.BOX:
-              b = scaleBox(data.box, scale);
-              this.drawBox(
-                ctx,
-                b[0] - scalex,
-                b[1] - scaley,
-                b[2] - b[0],
-                b[3] - b[1],
-                data.width,
-                color
-              );
-              break;
-
-            case SHAPES.REGION:
-              r = scaleBox(data.box, scale);
-              const opacity = data.opacity;
-              this.drawRegion(
-                ctx,
-                r[0] - scalex,
-                r[1] - scaley,
-                r[2] - r[0],
-                r[3] - r[1],
-                color,
-                opacity
-              );
-              break;
-
-            case SHAPES.IMAGE:
-              this.drawImage();
-              break;
-
-            case SHAPES.LABEL:
-              this.drawLabel();
-              break;
-          }
-        });
+        shapes.forEach(shape => shape.draw(context, CANVAS_SCALAR));
       });
+      context.restore();
     },
 
     /* UI CONTROL methods */
@@ -594,7 +463,7 @@ export default {
       const last_x = transformed[0];
       const last_y = transformed[1];
 
-      if (this.mouse.drag && mode === MODES.DRAG) {
+      if (this.mouse.drag && (mode === MODES.DRAG || mode === MODES.HANDLE)) {
         let width = last_x - down_x;
         let height = last_y - down_y;
         if (width < 0) {
