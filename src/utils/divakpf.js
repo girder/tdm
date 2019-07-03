@@ -7,39 +7,21 @@
  */
 
 import yaml from 'js-yaml';
-import { STATES } from './tdm';
 import { readUploadedFileAsText } from './index';
 
 export const COLOR_BY_TYPES = ['instance', 'activity'];
-
-/* eslint-disable */
-export const ACTIVITY_COLORS = {
-  'Casing_Facility': '#50EBEC',
-  'Carry_on_Back': 'red',
-  'Enter_Facility': 'orange',
-  'Exit_Facility': 'yellow',
-  'Hand_Interaction': 'green',
-  'Joining_Queue': '#E38AAE',
-  'Object_Transfer': 'lime',
-  'Open_Facility_Door': 'cyan',
-  'People_Talking': 'cyan',
-  'Pick_Up_Object': 'lime',
-  'Purchasing': 'yellow',
-  'Read_Document': 'orange',
-  'Set_Down_Object': 'lightblue',
-  'Sit_Down': 'magenta',
-  'Stand_Up': 'magenta',
-  'Text_On_Phone': '#F75D59',
-  'Unload_Vehicle': 'magenta',
-  'Unknown': 'lime',
-  'Vehicle_Moving': 'yellow',
-  'default': 'yellow',
-  'input': 'red',
-  'output': 'white',
-}; /* eslint-enable */
+export const KPF_EXTENSIONS = ['activities.yml', 'geom.yml', 'types.yml'];
 
 export const GEOM_ACTOR_KEY = 'id1';
+export const ACTIVITY_KEY = 'id2';
 export const TIMERANGE_KEY = 'tsr0';
+export const TIME_FRAMES_KEY = 'ts0';
+export const GEOM_BBOX_KEY = 'g0';
+export const IS_KEYFRAME_KEY = 'keyframe';
+
+export function defaultConfidenceFunc(detection, detections, index) {
+  return 1;
+}
 
 /**
  * KPF Class parses annotations defined in KPF yaml format.
@@ -65,7 +47,7 @@ export default class KPF {
    *   + activity.name
    */
   postProcess() {
-    this.geom = KPF.filterEmpty(this.geom, [GEOM_ACTOR_KEY, 'g0', 'ts0']);
+    this.geom = KPF.filterEmpty(this.geom, [GEOM_ACTOR_KEY, GEOM_BBOX_KEY, TIME_FRAMES_KEY]);
     if (this.activities) {
       this.activities = KPF.filterEmpty(this.activities, ['act2']);
     }
@@ -80,8 +62,8 @@ export default class KPF {
     this.types = newTypes;
     this.geom = this.geom.map(g => ({
       ...g,
-      bbox: g.bbox || g.g0.split(' ').map(f => parseFloat(f)),
-      ts0: g.ts0 || g.frame || 0,
+      bbox: g.bbox || g[GEOM_BBOX_KEY].split(' ').map(f => parseFloat(f)),
+      [TIME_FRAMES_KEY]: g[TIME_FRAMES_KEY] || g.frame || 0,
       [GEOM_ACTOR_KEY]: g[GEOM_ACTOR_KEY] || 0,
     }));
     this.geom.forEach((g) => {
@@ -97,10 +79,10 @@ export default class KPF {
         ...a,
         actors: a.actors.map(actor => ({
           ...actor,
-          timespan: actor.timespan[0][TIMERANGE_KEY],
+          timespan: actor.timespan[0][TIMERANGE_KEY], // Why is timespan an array?
           detections: KPF.filterRange(
             this.tracksByActor[actor[GEOM_ACTOR_KEY]],
-            'ts0',
+            TIME_FRAMES_KEY,
             actor.timespan[0][TIMERANGE_KEY][0],
             actor.timespan[0][TIMERANGE_KEY][1],
           ),
@@ -108,31 +90,33 @@ export default class KPF {
             ? this.types[actor[GEOM_ACTOR_KEY]].type
             : 'Unknown',
         })),
-        name: a.act2 ? Object.keys(a.act2)[0] : a.src, // TODO: this is terrible.
+        name: a.act2
+          ? Object.keys(a.act2)[0]
+          : a.src, // TODO: this is terrible.
       }));
     } else {
-      this.activities = Object.keys(this.tracksByActor).map((track) => {
-        return {
-          id2: parseInt(track, 10),
+      this.activities = Object
+        .keys(this.tracksByActor)
+        .map(track => ({
+          [ACTIVITY_KEY]: parseInt(track, 10),
           name: track,
           actors: [
             {
               [GEOM_ACTOR_KEY]: track,
               timespan: [
-                this.tracksByActor[track][0]['ts0'],
-                this.tracksByActor[track][this.tracksByActor[track].length - 1]['ts0'],
+                this.tracksByActor[track][0][TIME_FRAMES_KEY],
+                this.tracksByActor[track][this.tracksByActor[track].length - 1][TIME_FRAMES_KEY],
               ],
               type: this.types[track].type,
               detections: KPF.filterRange(
                 this.tracksByActor[track],
-                'ts0',
-                this.tracksByActor[track][0]['ts0'],
-                this.tracksByActor[track][this.tracksByActor[track].length - 1]['ts0'],
+                TIME_FRAMES_KEY,
+                this.tracksByActor[track][0][TIME_FRAMES_KEY],
+                this.tracksByActor[track][this.tracksByActor[track].length - 1][TIME_FRAMES_KEY],
               ),
             },
           ],
-        };
-      });
+        }));
     }
   }
 
@@ -147,51 +131,50 @@ export default class KPF {
         actor,
         timespan: actor.timespan,
         detections: actor.detections,
-        actorColor: actor.randomColor,
-      })))).sort((a, b) => a.detections[0].ts1 - b.detections[0].ts1);
+      })))).sort((a, b) => a.detections[0][TIME_FRAMES_KEY] - b.detections[0][TIME_FRAMES_KEY]);
   }
 
   /**
-   * Turn KPF into TDM trackx
+   * Turn KPF into TDM tracks
    * @param {Object} staticMeta static metadata to assign to all tracks.
    * @returns {Array<tdm.Track>}
    */
-  getTDM(staticMeta = {}, basekey = 'track') {
+  getTDM(staticMeta = {}, basekey = 'track', keyframesOnly = true, confidenceFunction = defaultConfidenceFunc) {
     return this.tracks.map((t, i) => {
       const meta = Object.assign({
         ...this.meta,
         name: t.activity.name,
-        activity_id: t.activity.id2,
+        activity_id: t.activity[ACTIVITY_KEY],
         type: t.actor.type,
         id: t.activity.id,
         actor_id: t.actor[GEOM_ACTOR_KEY],
         src_status: t.activity.src_status || 'unset',
       }, staticMeta);
+      const [begin, end] = t.timespan;
       const track = {
         meta,
         key: `${basekey}${i}`,
-        interpolated: t.detections.length < (t.timespan[1] - t.timespan[0]),
-        color: 'green',
-        state: STATES.ACTIVE,
-        begin: t.timespan[0],
-        end: t.timespan[1],
+        interpolated: t.detections.length < (end - begin) || keyframesOnly,
+        begin,
+        end,
       };
       const detections = [];
       for (let idx = 0; idx < t.detections.length; idx += 1) {
         const d = t.detections[idx];
-        const frame = d.frame || d.ts0;
-        detections[idx] = {
-          frame,
-          meta: {
-            src: d.src,
-            occlusion: d.occlusion,
-            confidence: (idx === 0 || (idx === t.detections.length - 1)) ? 0.001 : 1,
-            ...track.meta,
-          },
-          box: d.bbox,
-        };
+        if ((keyframesOnly && d[IS_KEYFRAME_KEY]) || !keyframesOnly) {
+          const frame = d.frame || d[TIME_FRAMES_KEY];
+          detections.push({
+            frame,
+            meta: {
+              src: d.src,
+              occlusion: d.occlusion,
+              confidence: confidenceFunction(d, detections, idx),
+            },
+            box: d.bbox,
+          });
+        }
       }
-      track.detections = detections.sort((a, b) => b.frame - a.frame);
+      track.detections = detections.sort((a, b) => a.frame - b.frame);
       return track;
     });
   }

@@ -10,7 +10,7 @@ Tracks, Detections, and Metadata, are the most basic units of 2D spaceotemporal 
 
 TDM is **not concerned** with your specific domain, data format, or use case.  It is your responsibility to translate your annotations to the TDM schema.
 
-Signal-type metadata is also supported with our without associated spacial detections.  This is useful for displaying data computed about an entire video frame, such as "how bright is it?" or "what is the probability that a particular metric is true right now?".
+Signal-type metadata is also supported with/without associated spacial detections.  This is useful for displaying data computed about an entire video frame, such as "how bright is it?" or "what is the probability that a particular metric is true right now?".
 
 ## Displaying TDM data
 
@@ -90,7 +90,7 @@ Try the demo at https://girder.github.io/tdm/
 
 ## Example data
 
-Here's some trivial data.  When rendered, these tracks can be colored, sorted, and filtered by their metadata.  
+Here's some trivial data. 
 
 ```js
 const tracks = [
