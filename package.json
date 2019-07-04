@@ -93,7 +93,7 @@
       "jest-serializer-vue"
     ],
     "testMatch": [
-      "**/tests/unit/**/*.spec.js"
+      "**/tests/**/*.spec.js"
     ]
   },
   "pugLintConfig": {

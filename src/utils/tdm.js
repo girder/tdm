@@ -20,6 +20,8 @@ matching a certain value.
 
 */
 
+import { findRange } from './listutils';
+
 /**
  * @typedef {string} TrackState
  */
@@ -36,22 +38,20 @@ export const STATES = {
 };
 
 /**
- * Event Schema; an event is a range within a track
- * @typedef {Object} Event
- * @param {Track} track reference to the parent track
- * @param {Number} begin integer frame #
- * @param {Number} end integer frame #
+ * Whole integer frame number
+ * @typedef {number} Frame
  */
 
 /**
  * Detection Schema; a detection describes a single frame within a track
  * @typedef {Object} Detection
- * @property {Number} frame
+ * @property {Frame} frame
  * @property {Array<Number>} box [x_left, y_top, x_right, y_bottom]
  *                               null box means this detection applies to entire frame
  * @property {String} image a url for an image to overlay within box
  * @property {Metadata} meta metadata for this single detection
  */
+
 
 /**
  * Track Schema; a track is an annotated range within a single video
@@ -59,9 +59,17 @@ export const STATES = {
  * @property {String} key a unique key to identify the track
  * @property {Metadata} meta
  * @property {Array<Detection>} detections
- * @property {Number} begin
- * @property {Number} end
+ * @property {Frame} begin
+ * @property {Frame} end
  * @property {Boolean} interpolated whether the detections need interpolation
+ */
+
+/**
+ * Event Schema; an event is a range within a track
+ * @typedef {Object} Event
+ * @property {Track} track reference to the parent track
+ * @property {Frame} begin integer frame #
+ * @property {Frame} end integer frame #
  */
 
 /* Private functions */
@@ -120,7 +128,30 @@ function interpolateFrames(currentFrame, d0, d1) {
   }
   const meta = { ...d0.meta, interpolated };
   const frame = Math.round((d0.frame * a) + (d1.frame * b));
-  return { ...d0, meta, frame, box };
+  return {
+    ...d0,
+    meta,
+    frame,
+    box,
+  };
+}
+
+/**
+ * Get range of detections with final detection interpolated
+ * @param {Array<Detection>} detections
+ * @param {Frame} start
+ * @param {Frame} end
+ */
+function getInterpolatedRange(detections, start, end) {
+  const range = findRange(detections, start, end, 'frame');
+  if (range.length >= 2) {
+    const endFrame = interpolateFrames(end, range[range.length - 2], range[range.length - 1]);
+    range[range.length - 1] = endFrame;
+    return range;
+  } else if (range.length === 1) {
+    return range;
+  }
+  return [];
 }
 
 /**
@@ -183,6 +214,7 @@ function mergeFrameArrays(a, b) {
     if (a[frame]) {
       a[frame].push(...thinglist);
     } else {
+      // eslint-disable-next-line no-param-reassign
       a[frame] = thinglist;
     }
   });
@@ -194,6 +226,7 @@ export {
   eventsForThreshold,
   filterByMeta,
   interpolateFrames,
+  getInterpolatedRange,
   mergeFrameArrays,
   scaleBox,
 };

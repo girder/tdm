@@ -4,8 +4,8 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 
-import { binarySearch } from '../utils';
-import { eventsForThreshold, STATES, interpolateFrames } from '../utils/tdm';
+import { insert as listinsert, remove as listremove } from '../utils/listutils';
+import { eventsForThreshold, STATES, getInterpolatedRange } from '../utils/tdm';
 import { CONTRAST_COLORS, SEQUENCE_COLORS, DISABLED_COLOR } from '../constants';
 
 Vue.use(Vuex);
@@ -54,51 +54,21 @@ const getters = {
 
   activeContinuousFrames: state => (startframe, endframe) => {
     let start = Math.round(startframe);
-    let end = Math.round(endframe + 1); // include the last frame
+    let end = Math.round(endframe); // include the last frame
     if (endframe < startframe) {
-      start = Math.round(endframe);
-      end = Math.round(endframe + 1);
+      let tmp = end;
+      end = start;
+      start = tmp;
     }
     if (start < 0 || end < 0) {
       return [];
     }
     return state.tracks
       // .filter(trackinfo => !trackinfo.interpolated)
-      .filter(track => track.begin <= start)
+      .filter(track => track.begin <= start && track.end >= start)
       .map((track) => {
-        let starti = binarySearch(track.detections, { frame: start }, (a, b) => a.frame - b.frame);
-        if (starti < 0) {
-          starti = Math.abs((starti + 1) * -1);
-        }
-        const ret = [];
-        if (starti > 0 && starti < track.detections.length) {
-          ret.push(interpolateFrames(
-            start,
-            track.detections[starti - 1],
-            track.detections[starti],
-          ));
-        } else if (starti === 0) {
-          ret.push(track.detections[starti]);
-        } else {
-          ret.push(track.detections[starti - 1]);
-        }
-        let detection = track.detections[starti];
-        while (detection && detection.frame <= end) {
-          ret.push(detection);
-          starti += 1;
-          detection = track.detections[starti];
-        }
-        if (detection && detection.frame > end) {
-          ret.push(interpolateFrames(
-            end,
-            track.detections[starti - 1],
-            track.detections[starti],
-          ));
-        }
-        return {
-          track,
-          detections: ret,
-        };
+        const detections = getInterpolatedRange(track.detections, start, end);
+        return { track, detections };
       });
   },
 };
@@ -187,16 +157,10 @@ const mutations = {
   setDetection(state, { trackKey, frame, detection, remove = false }) {
     const track = state.tracks.find(t => t.key === trackKey);
     if (track) {
-      const position = binarySearch(track.detections, { frame }, (a, b) => a.frame - b.frame);
-      if (position >= 0) {
-        if (remove) {
-          track.detections.splice(position, 1);
-        } else {
-          track.detections[position] = detection;
-        }
-        // Vue.set(track.detections, position, detection);
-      } else if (!remove) {
-        track.detections.splice((position * -1) - 1, 0, detection);
+      if (remove) {
+        listremove(track.detections, { frame }, 'frame');
+      } else {
+        listinsert(track.detections, { detection }, 'frame');
       }
     } else {
       throw new Error(`Track ${trackKey} not found`);
