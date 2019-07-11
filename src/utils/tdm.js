@@ -181,8 +181,8 @@ function filterByMeta(items, key, values) {
  */
 function centroid(box, x = 0.5, y = 0.5) {
   return [
-    Math.round((box[2] * x) + (box[0] * x)),
-    Math.round((box[3] * y) + (box[1] * y)),
+    Math.round((box[2] * x) + (box[0] * (1 - x))),
+    Math.round((box[3] * y) + (box[1] * (1 - y))),
   ];
 }
 

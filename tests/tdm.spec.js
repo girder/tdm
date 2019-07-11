@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 
-import { interpolateFrames, getInterpolatedRange } from '../src/utils/tdm';
+import { interpolateFrames, getInterpolatedRange, centroid } from '../src/utils/tdm';
 
 describe('interpolateFrames', () => {
   it('can perform simple interpolation', () => {
@@ -71,5 +71,19 @@ describe('getInterpolatedRange', () => {
     expect(r4).toHaveLength(2);
     expect(r4[0].frame).toBe(0);
     expect(r4[1].frame).toBe(2);
+  });
+});
+
+describe('centroid', () => {
+  it('gets a 2d centroid for a 2d box', () => {
+    const box = [10, 20, 30, 40];
+    const c1 = centroid(box);
+
+    expect(c1[0]).toBe(20);
+    expect(c1[1]).toBe(30);
+
+    const c2 = centroid(box, 0.1, 0.1);
+    expect(c2[0]).toBe(12);
+    expect(c2[1]).toBe(22);
   });
 });
