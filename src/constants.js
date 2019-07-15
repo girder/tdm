@@ -21,7 +21,7 @@ export const SEQUENCE_COLORS = [
   '#003c30',
 ];
 export const DISABLED_COLOR = '#a0a0a0';
-
+export const SVGNS = "http://www.w3.org/2000/svg";
 export const MODES = {
   PAN: 1, // Dragging does pans
   DRAG: 2, // Only callback on complete drag

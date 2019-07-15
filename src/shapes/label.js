@@ -2,13 +2,15 @@ export default class Label {
   constructor({
     x, y,
     text,
-    font = '12px mono',
+    fontSize = 12,
+    fontFamily = 'mono',
     color = 'white',
   } = {}) {
     this.x = x;
     this.y = y;
     this.text = text;
-    this.font = font;
+    this.fontSize = fontSize;
+    this.fontFamily = fontFamily;
     this.color = color;
   }
 
@@ -17,13 +19,17 @@ export default class Label {
     ctx.save();
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = this.color;
-    ctx.font = this.font;
-    // const tw = ctx.measureText(this.text).width;
+    ctx.font = `${this.fontSize}px ${this.fontFamily}`;
+    const tw = ctx.measureText(this.text).width;
     ctx.fillText(
       this.text,
       this.x,
       this.y,
     );
     ctx.restore();
+  }
+
+  intersect(x2, y2) {
+    return false;
   }
 }

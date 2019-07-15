@@ -1,4 +1,4 @@
-export default class Rectangle {
+export default class Marker {
   constructor({
     x, y,
     width, height,
@@ -34,10 +34,6 @@ export default class Rectangle {
 
   intersect(x2, y2) {
     const { x, y, width, height } = this;
-    return (Math.abs(x2 - x) < (width / 2)) && (Math.abs(y2 - y) < (height));
-  }
-
-  hover() {
-    // TODO
+    return (Math.abs(x2 - x) < (width / 2)) && (Math.abs(y2 - (y - (height / 2))) < height);
   }
 }

@@ -264,7 +264,9 @@ export default {
       current = null,
       follow = null,
     }) {
+
       this.clearCanvas(this.ctx);
+
       if (!this.src) {
         this.drawInfo(this.ctx, this.noSourceMessage);
         return;
@@ -384,7 +386,7 @@ export default {
      * takes x, y, width, height in real source coordinates
      * draws shapes into the given context
      */
-    drawShapes({ context, shapeslist, x = 0, y = 0, width, height }) {
+    drawShapes({ context, shapeslist, x = 0, y = 0, width, height}) {
       const ctx = context;
       const scale = ctx.canvas.width / width;
       context.save()

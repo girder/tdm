@@ -1,3 +1,5 @@
+import SVG from 'svg.js';
+
 export default class Point {
   constructor({
     x, y,
@@ -39,9 +41,5 @@ export default class Point {
       return true;
     }
     return false;
-  }
-
-  hover() {
-    // TODO
   }
 }
