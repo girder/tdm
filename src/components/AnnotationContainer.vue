@@ -477,7 +477,7 @@ export default {
           height = -1 * height;
         }
         this._handleEvent('drag', { width, height, x: down_x, y: down_y });
-      } else if (mode === MODES.HANDLE && (src)) {
+      } else if (src) {
         this._handleEvent('move', { x: last_x, y: last_y })
       }
       this.mouse.last_x = last_x;
