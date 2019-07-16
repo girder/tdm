@@ -1,5 +1,3 @@
-import SVG from 'svg.js';
-
 export default class Point {
   constructor({
     x, y,
