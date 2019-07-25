@@ -221,6 +221,10 @@ function mergeFrameArrays(a, b) {
   return a;
 }
 
+function sortDetections(a, b) {
+  return a.frame - b.frame;
+}
+
 export {
   centroid,
   eventsForThreshold,
@@ -229,4 +233,5 @@ export {
   getInterpolatedRange,
   mergeFrameArrays,
   scaleBox,
+  sortDetections,
 };

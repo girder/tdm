@@ -38,3 +38,21 @@ ls /path/to/kw18_basename*
 # convert
 ./kw18.js --basepath /path/to/kw18_basename > out.tdm.json
 ```
+
+## viame.js
+
+An offline converter to turn Viame CSV into TDM.
+
+```bash
+cat /path/to/viame.csv
+
+# A Viame file looks like this:
+
+# 0,X,0,1,1,2,2,X,X,dog
+# 0,X,1,2,2,4,4,X,X,dog
+# 0,X,9,4,5,6,6,X,X,dog
+# 1,X,0,1,2,4,5,X,X,person
+
+# convert
+./viame.js --file /path/to/viame.csv --separator ',' > out.tdm.json
+```
