@@ -2,6 +2,12 @@
 
 This is a loose collection of tools for working with TDM.
 
+## Installing
+
+* Install a recent version of Node.js
+* Clone this repo
+* Run `yarn install` from the parent directory
+
 ## kpf.js
 
 An offline converter to turn KPF into TDM.
@@ -18,14 +24,14 @@ ls /path/to/kpf_basename*
 ./kpf.js --basepath /path/to/kpf_basename > out.tdm.json
 ```
 
-## kw18
+## kw18.js
 
 An offline converter to turn KW18 into TDM.
 
 ```bash
 # Expext basepath name to have 2 files with given extensions:
 
-ls /path/to/kw18_basename
+ls /path/to/kw18_basename*
 # /path/to/kw18_basename.kw18
 # /path/to/kw18_basename.kw18.types
 
