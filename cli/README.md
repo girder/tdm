@@ -56,3 +56,17 @@ cat /path/to/viame.csv
 # convert
 ./viame.js --file /path/to/viame.csv --separator ',' > out.tdm.json
 ```
+
+# Docker
+
+You can run these tools in docker.
+
+```bash
+# Build from the parent context
+docker build -t kpfcli -f Dockerfile ../
+
+# Run with working directory mounted at wd/
+docker run -it --rm -v "${PWD}:/wd" kpfcli viame.js --file /wd/viame.csv > out.tdm.json
+
+# The entrypoint is 'node' so you can specify which of the scripts you want to run
+```
